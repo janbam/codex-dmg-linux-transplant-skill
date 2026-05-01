@@ -112,10 +112,11 @@ import sys
 path = Path(sys.argv[1])
 text = path.read_text()
 
-dispatch_match = re.search(r"E\.dispatchMessage\(`electron-desktop-features-changed`,\s*\{", text)
+dispatch_match = re.search(r"([A-Za-z_$][A-Za-z0-9_$]*)\.dispatchMessage\(`electron-desktop-features-changed`,\s*\{", text)
 if dispatch_match is None:
     raise SystemExit('failed to locate desktop feature dispatch call')
 dispatch_index = dispatch_match.start()
+dispatch_object = dispatch_match.group(1)
 
 lines = text.splitlines(keepends=True)
 line_offsets = []
@@ -161,7 +162,15 @@ if func_end_line is None:
 
 original_region = ''.join(lines[func_start_line:func_end_line])
 if '(0, Z.useEffect)' not in original_region or 'browserPane' not in original_region:
-    raise SystemExit('desktop feature function candidate failed validation')
+    if not re.search(r"\(0,\s*[A-Za-z_$][A-Za-z0-9_$]*\.useEffect\)", original_region):
+        raise SystemExit('desktop feature function candidate failed validation')
+
+cache_match = re.search(r"let\s+\w+\s*=\s*\(0,\s*([A-Za-z_$][A-Za-z0-9_$]*)\.c\)\(\d+\)", original_region)
+effect_match = re.search(r"\(0,\s*([A-Za-z_$][A-Za-z0-9_$]*)\.useEffect\)", original_region)
+if cache_match is None or effect_match is None:
+    raise SystemExit('failed to identify React compiler helpers in desktop feature function')
+cache_object = cache_match.group(1)
+effect_object = effect_match.group(1)
 
 feature_order = [
     'avatarOverlay',
@@ -181,14 +190,14 @@ if 'browserPane' not in active_features:
 
 feature_lines = '\n'.join(f'            {name}: t,' for name in active_features)
 dispatch_block = f"""function __FORCED_DESKTOP_FLAGS__() {{
-  let e = (0, Q.c)(4),
+  let e = (0, {cache_object}.c)(4),
     t = !0,
     n,
     r;
   return (
     e[0] !== t
       ? ((n = () => {{
-          E.dispatchMessage(`electron-desktop-features-changed`, {{
+          {dispatch_object}.dispatchMessage(`electron-desktop-features-changed`, {{
 {feature_lines}
           }});
         }}),
@@ -197,7 +206,7 @@ dispatch_block = f"""function __FORCED_DESKTOP_FLAGS__() {{
         (e[1] = n),
         (e[2] = r))
       : ((n = e[1]), (r = e[2])),
-    (0, Z.useEffect)(n, r),
+    (0, {effect_object}.useEffect)(n, r),
     null
   );
 }}"""
@@ -227,6 +236,13 @@ for old in [
     'Zf(`1506311413`)',
     'Zf(`2171042036`)',
     'Zf(`459748632`)',
+    'ms(`2679188970`)',
+    'ms(`2425897452`)',
+    'ms(`3903742690`)',
+    'ms(`1506311413`)',
+    'ms(`2171042036`)',
+    'ms(`459748632`)',
+    'ms(`2212532336`)',
     'Yp()',
 ]:
     text = text.replace(old, '!0')
@@ -243,7 +259,7 @@ if ! rg -q 'browserPane: t' "$target_js"; then
   exit 1
 fi
 
-if rg -q 'hf\(`2679188970`\)|hf\(`2425897452`\)|hf\(`3903742690`\)|hf\(`410262010`\)|hf\(`1506311413`\)|hf\(`2171042036`\)|hf\(`459748632`\)|hf\(`2251025435`\)|xu\(`2679188970`\)|xu\(`2425897452`\)|xu\(`3903742690`\)|xu\(`4250630194`\)|xu\(`459748632`\)|xu\(`2251025435`\)|xu\(bI\)|Zf\(`2679188970`\)|Zf\(`2425897452`\)|Zf\(`3903742690`\)|Zf\(`1506311413`\)|Zf\(`2171042036`\)|Zf\(`459748632`\)|\bYp\(\)' "$target_js"; then
+if rg -q 'hf\(`2679188970`\)|hf\(`2425897452`\)|hf\(`3903742690`\)|hf\(`410262010`\)|hf\(`1506311413`\)|hf\(`2171042036`\)|hf\(`459748632`\)|hf\(`2251025435`\)|xu\(`2679188970`\)|xu\(`2425897452`\)|xu\(`3903742690`\)|xu\(`4250630194`\)|xu\(`459748632`\)|xu\(`2251025435`\)|xu\(bI\)|Zf\(`2679188970`\)|Zf\(`2425897452`\)|Zf\(`3903742690`\)|Zf\(`1506311413`\)|Zf\(`2171042036`\)|Zf\(`459748632`\)|ms\(`2679188970`\)|ms\(`2425897452`\)|ms\(`3903742690`\)|ms\(`1506311413`\)|ms\(`2171042036`\)|ms\(`459748632`\)|ms\(`2212532336`\)|\bYp\(\)' "$target_js"; then
   echo 'desktop flag gate calls still remain after patch' >&2
   exit 1
 fi
