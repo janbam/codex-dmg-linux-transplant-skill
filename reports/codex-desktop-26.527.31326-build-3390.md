@@ -108,6 +108,19 @@ Before `electron-rebuild`, adapt the addon source to:
 The rebuild script now performs this narrowly guarded adaptation and fails
 loudly if the expected upstream source shape changes.
 
+## Code Review Hardening
+
+Code review caught two compatibility hazards before merge:
+
+- rerunning extraction into an interrupted or older stage could retain stale
+  unpacked payload; extraction now replaces only the staged
+  `resources/app.asar.unpacked` subtree before copying the fresh DMG tree
+- the Electron 42 V8 pointer-tag bridge initially ran unconditionally and could
+  break older DMGs; the rebuild script now applies it only for Electron `42+`
+
+Focused regression checks proved that a staged stale sentinel is removed and
+that an Electron `41.0.0` rebuild fixture skips the Electron 42 bridge.
+
 ## Local CLI Version Skew
 
 The local forked CLI is two minor releases behind upstream. Desktop startup and
@@ -142,4 +155,3 @@ window ready-to-show
 ```
 
 The human live smoke test also passed.
-
