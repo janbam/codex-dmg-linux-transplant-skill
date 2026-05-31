@@ -29,6 +29,47 @@ trap cleanup EXIT
 extract_dir="$tmp_dir/extracted"
 mkdir -p "$extract_dir"
 
+# Materialize absent unpacked references once so asar extraction does not retry
+# hundreds of times for macOS-only files that the Linux transplant never uses.
+python3 - <<'PY' "$asar_path" "$unpacked_dir"
+import json
+import pathlib
+import sys
+
+asar_path = pathlib.Path(sys.argv[1])
+unpacked_dir = pathlib.Path(sys.argv[2])
+with asar_path.open('rb') as f:
+    header_sizes = [int.from_bytes(f.read(4), 'little') for _ in range(4)]
+    header = json.loads(f.read(header_sizes[3]))
+
+created = 0
+
+def materialize(node, parts, inherited_unpacked=False):
+    global created
+    is_unpacked = inherited_unpacked or node.get('unpacked', False)
+    files = node.get('files')
+    if files is not None:
+        for name, child in files.items():
+            materialize(child, parts + [name], is_unpacked)
+        return
+
+    if not is_unpacked:
+        return
+
+    path = unpacked_dir.joinpath(*parts)
+    if path.exists():
+        return
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.touch()
+    if node.get('executable'):
+        path.chmod(path.stat().st_mode | 0o111)
+    created += 1
+
+materialize(header, [])
+print(f'materialized {created} missing unpacked placeholders')
+PY
+
 extract_err="$tmp_dir/extract.err"
 attempt=0
 while true; do
@@ -45,7 +86,7 @@ while true; do
     exit 1
   fi
 
-  missing_path="$(python - <<'PY' "$extract_err"
+  missing_path="$(python3 - <<'PY' "$extract_err"
 import pathlib, re, sys
 text = pathlib.Path(sys.argv[1]).read_text(errors='ignore')
 m = re.search(r"ENOENT: .* open '([^']+app\.asar\.unpacked[^']+)'", text)
@@ -104,7 +145,7 @@ fi
 pretty_js="$tmp_dir/index.pretty.js"
 npx --yes prettier "$target_js" > "$pretty_js"
 
-python - <<'PY' "$pretty_js"
+python3 - <<'PY' "$pretty_js"
 from pathlib import Path
 import re
 import sys
@@ -279,5 +320,10 @@ else
   npx --yes asar pack "$extract_dir" "$patched_asar"
 fi
 
+# Keep the externalized payload beside the patched archive. The repack step can
+# unpack additional dependencies beyond the DMG's original native-module tree.
+if [[ -d "${patched_asar}.unpacked" ]]; then
+  cp -a "${patched_asar}.unpacked/." "$unpacked_dir/"
+fi
 install -m 0644 "$patched_asar" "$asar_path"
 echo "patched desktop flags in $asar_path"

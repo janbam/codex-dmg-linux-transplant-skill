@@ -27,6 +27,61 @@ npm install --prefix "$build_dir" --no-save @electron/rebuild \
   "better-sqlite3@${better_sqlite3_version}" \
   "node-pty@${node_pty_version}"
 
+# Bridge better-sqlite3 only when Electron exposes the mandatory V8 pointer tag.
+electron_major="${electron_version%%.*}"
+if [[ ! "$electron_major" =~ ^[0-9]+$ ]]; then
+  echo "invalid electron version: $electron_version" >&2
+  exit 1
+fi
+if (( electron_major >= 42 )); then
+python3 - <<'PY' "$build_dir/node_modules/better-sqlite3"
+from pathlib import Path
+import sys
+
+module_dir = Path(sys.argv[1])
+
+
+def replace_once_or_verify(path, old, new):
+    text = path.read_text()
+    if new in text:
+        return
+    if old not in text:
+        raise SystemExit(f'failed to patch unexpected better-sqlite3 source: {path}')
+    path.write_text(text.replace(old, new, 1))
+
+
+replace_once_or_verify(
+    module_dir / 'src/util/macros.cpp',
+    '#define OnlyAddon static_cast<Addon*>(info.Data().As<v8::External>()->Value())',
+    '''#if defined(NODE_MODULE_VERSION) && NODE_MODULE_VERSION >= 146
+// Preserve the addon pointer behind Electron 42's mandatory V8 sandbox tag.
+#define OnlyAddon static_cast<Addon*>(info.Data().As<v8::External>()->Value(v8::kExternalPointerTypeTagDefault))
+#else
+#define OnlyAddon static_cast<Addon*>(info.Data().As<v8::External>()->Value())
+#endif''',
+)
+replace_once_or_verify(
+    module_dir / 'src/util/helpers.cpp',
+    '''\t\tfunc,
+\t\t0,
+\t\tdata''',
+    '''\t\tfunc,
+\t\tnullptr,
+\t\tdata''',
+)
+replace_once_or_verify(
+    module_dir / 'src/better_sqlite3.cpp',
+    '\tv8::Local<v8::External> data = v8::External::New(isolate, addon);',
+    '''\t#if defined(NODE_MODULE_VERSION) && NODE_MODULE_VERSION >= 146
+\t// Preserve the addon pointer behind Electron 42's mandatory V8 sandbox tag.
+\tv8::Local<v8::External> data = v8::External::New(isolate, addon, v8::kExternalPointerTypeTagDefault);
+\t#else
+\tv8::Local<v8::External> data = v8::External::New(isolate, addon);
+\t#endif''',
+)
+PY
+fi
+
 "$build_dir/node_modules/.bin/electron-rebuild" -f -v "$electron_version" -w better-sqlite3,node-pty --module-dir "$build_dir"
 
 rm -rf "$stage_dir/resources/app.asar.unpacked/node_modules/better-sqlite3"

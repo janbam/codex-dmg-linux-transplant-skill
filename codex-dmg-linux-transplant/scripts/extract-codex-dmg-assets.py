@@ -39,16 +39,24 @@ def main():
     with tempfile.TemporaryDirectory() as td:
         out = Path(td)
         run(['7z', 'x', str(dmg), '-ir!Codex Installer/Codex.app/Contents/Resources/app.asar', '-y', f'-o{out}'])
+        run(['7z', 'x', str(dmg), '-ir!Codex Installer/Codex.app/Contents/Resources/app.asar.unpacked', '-y', f'-o{out}'])
         run(['7z', 'x', str(dmg), '-ir!Codex Installer/Codex.app/Contents/Resources/electron.icns', '-y', f'-o{out}'])
 
         app_asar = out / 'Codex Installer' / 'Codex.app' / 'Contents' / 'Resources' / 'app.asar'
+        app_asar_unpacked = out / 'Codex Installer' / 'Codex.app' / 'Contents' / 'Resources' / 'app.asar.unpacked'
         icns = out / 'Codex Installer' / 'Codex.app' / 'Contents' / 'Resources' / 'electron.icns'
         if not app_asar.exists():
             raise SystemExit('failed to extract app.asar from dmg')
+        if not app_asar_unpacked.is_dir():
+            raise SystemExit('failed to extract app.asar.unpacked from dmg')
         if not icns.exists():
             raise SystemExit('failed to extract default icon from dmg')
 
         shutil.copy2(app_asar, stage / 'resources' / 'app.asar')
+        # Replace the DMG payload so interrupted or older stages cannot leak stale files.
+        stage_app_asar_unpacked = stage / 'resources' / 'app.asar.unpacked'
+        shutil.rmtree(stage_app_asar_unpacked, ignore_errors=True)
+        shutil.copytree(app_asar_unpacked, stage_app_asar_unpacked)
         shutil.copy2(icns, stage / 'icon.icns')
 
         Image = ensure_pillow(stage / '.python-deps')

@@ -19,7 +19,7 @@ Use:
 ../scripts/patch-desktop-flags.sh ~/.local/opt/codex-desktop
 ```
 
-The script extracts `resources/app.asar`, tolerates missing unpacked dev-only files by creating placeholders when needed, patches the renderer bundle, and repacks `app.asar` while preserving unpacked native modules.
+The script extracts `resources/app.asar`, materializes placeholders for missing unpacked dev-only files in one pass, patches the renderer bundle, and repacks `app.asar` while preserving both native modules and any additional dependencies externalized by the repack.
 
 ## Automatic application
 
