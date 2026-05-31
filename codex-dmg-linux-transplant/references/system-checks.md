@@ -65,6 +65,7 @@ The user asked for a single main desktop version. Check and later clean up:
 The transplant must extract both:
 
 - `app.asar`
+- `app.asar.unpacked`
 - the default Codex icon from the DMG
 
 Do not ship a placeholder icon.

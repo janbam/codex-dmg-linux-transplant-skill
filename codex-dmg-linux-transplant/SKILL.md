@@ -46,12 +46,13 @@ Use a provided path if available. Otherwise search safely. If nothing is found, 
 Run:
 
 ```bash
-python ./scripts/extract-codex-dmg-metadata.py /path/to/Codex.dmg
-python ./scripts/extract-codex-dmg-assets.py /path/to/Codex.dmg /tmp/codex-stage
+python3 ./scripts/extract-codex-dmg-metadata.py /path/to/Codex.dmg
+python3 ./scripts/extract-codex-dmg-assets.py /path/to/Codex.dmg /tmp/codex-stage
 ```
 
 This must produce at least:
 - `resources/app.asar`
+- `resources/app.asar.unpacked`
 - the default app icon as `icon.png`
 
 ### 4) Build a Linux host bundle from scratch

@@ -25,7 +25,7 @@ Produce one main install at:
 2. Install missing prerequisites with `../scripts/ensure-prereqs.sh`
 3. Resolve the DMG path
 4. Extract metadata with `../scripts/extract-codex-dmg-metadata.py`
-5. Extract `app.asar` and the default app icon with `../scripts/extract-codex-dmg-assets.py`
+5. Extract `app.asar`, `app.asar.unpacked`, and the default app icon with `../scripts/extract-codex-dmg-assets.py`
 6. Bootstrap a self-contained Electron runtime with `../scripts/bootstrap-electron-runtime.sh`
 7. Install a Linux Codex CLI into the bundle with `../scripts/install-codex-cli.sh`
 8. Rebuild Linux-native modules with `../scripts/rebuild-native-modules.sh`
