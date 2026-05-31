@@ -27,7 +27,13 @@ npm install --prefix "$build_dir" --no-save @electron/rebuild \
   "better-sqlite3@${better_sqlite3_version}" \
   "node-pty@${node_pty_version}"
 
-# Bridge better-sqlite3 across Electron 42's mandatory V8 external-pointer tag.
+# Bridge better-sqlite3 only when Electron exposes the mandatory V8 pointer tag.
+electron_major="${electron_version%%.*}"
+if [[ ! "$electron_major" =~ ^[0-9]+$ ]]; then
+  echo "invalid electron version: $electron_version" >&2
+  exit 1
+fi
+if (( electron_major >= 42 )); then
 python3 - <<'PY' "$build_dir/node_modules/better-sqlite3"
 from pathlib import Path
 import sys
@@ -74,6 +80,7 @@ replace_once_or_verify(
 \t#endif''',
 )
 PY
+fi
 
 "$build_dir/node_modules/.bin/electron-rebuild" -f -v "$electron_version" -w better-sqlite3,node-pty --module-dir "$build_dir"
 

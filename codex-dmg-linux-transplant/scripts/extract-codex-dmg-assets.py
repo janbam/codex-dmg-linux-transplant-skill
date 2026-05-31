@@ -53,7 +53,10 @@ def main():
             raise SystemExit('failed to extract default icon from dmg')
 
         shutil.copy2(app_asar, stage / 'resources' / 'app.asar')
-        shutil.copytree(app_asar_unpacked, stage / 'resources' / 'app.asar.unpacked', dirs_exist_ok=True)
+        # Replace the DMG payload so interrupted or older stages cannot leak stale files.
+        stage_app_asar_unpacked = stage / 'resources' / 'app.asar.unpacked'
+        shutil.rmtree(stage_app_asar_unpacked, ignore_errors=True)
+        shutil.copytree(app_asar_unpacked, stage_app_asar_unpacked)
         shutil.copy2(icns, stage / 'icon.icns')
 
         Image = ensure_pillow(stage / '.python-deps')
