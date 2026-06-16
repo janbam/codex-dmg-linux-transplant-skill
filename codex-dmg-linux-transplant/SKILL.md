@@ -52,6 +52,7 @@ python ./scripts/extract-codex-dmg-assets.py /path/to/Codex.dmg /tmp/codex-stage
 
 This must produce at least:
 - `resources/app.asar`
+- `resources/app.asar.unpacked`
 - the default app icon as `icon.png`
 
 ### 4) Build a Linux host bundle from scratch

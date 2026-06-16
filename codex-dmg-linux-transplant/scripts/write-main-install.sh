@@ -58,6 +58,8 @@ cat > "$wrapper_path" <<'EOF'
 set -euo pipefail
 
 export ELECTRON_FORCE_IS_PACKAGED=1
+export BUILD_FLAVOR="${BUILD_FLAVOR:-prod}"
+export CODEX_BUILD_NUMBER="${CODEX_BUILD_NUMBER:-__CODEX_BUILD_NUMBER__}"
 
 local_cli="$HOME/.local/opt/codex-desktop/cli/node_modules/.bin/codex"
 if [[ -x "$local_cli" ]]; then
@@ -75,6 +77,14 @@ fi
 
 exec "$HOME/.local/opt/codex-desktop/electron/node_modules/electron/dist/electron" "${extra_flags[@]}" "$HOME/.local/opt/codex-desktop/resources/app.asar" "$@"
 EOF
+python3 - <<'PY' "$wrapper_path" "$build_number"
+from pathlib import Path
+import sys
+
+path = Path(sys.argv[1])
+build_number = sys.argv[2]
+path.write_text(path.read_text().replace('__CODEX_BUILD_NUMBER__', build_number))
+PY
 chmod +x "$wrapper_path"
 
 cat > "$desktop_path" <<EOF
