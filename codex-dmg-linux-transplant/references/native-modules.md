@@ -27,7 +27,7 @@ Do not reuse mac binaries for Linux:
 
 A clean Linux install must not depend on a preexisting global `codex` command.
 
-Install a Linux Codex CLI into the bundle and point `CODEX_CLI_PATH` at it. A global `codex` may be used only as a fallback.
+Install a Linux Codex CLI into the bundle so recovery does not depend on a global command. The wrapper should prefer the user's local `codex` by default and expose the bundled CLI through `--bundled-codex`.
 
 ## Rebuild strategy
 
@@ -35,7 +35,7 @@ Use the Electron version extracted from the DMG metadata.
 
 Install the target packages in a staging build directory, then rebuild them specifically for the target Electron version. The helper script uses `electron-rebuild` for this.
 
-For Electron 42 and newer, the helper also adapts `better-sqlite3` source to V8's mandatory external-pointer tag before rebuilding.
+For Electron 42 and newer, the helper adapts older `better-sqlite3` source to V8's mandatory external-pointer tag before rebuilding. Newer `better-sqlite3` releases already include `EXTERNAL_NEW` and `EXTERNAL_VALUE` helper macros; treat those as the upstream fix and do not apply the stale patch shape again.
 
 ## If launch still fails
 

@@ -37,10 +37,13 @@ Use fixed paths so updates replace the main install instead of creating side-by-
 The wrapper should:
 
 - set `ELECTRON_FORCE_IS_PACKAGED=1`
-- prefer the bundled Linux Codex CLI path first
-- optionally fall back to a global `codex`
+- use an executable `CODEX_CLI_PATH` when one is already set
+- prefer the user's local `codex` by default when it is available
+- fall back to the bundled Linux Codex CLI if no local CLI is found
+- accept `--bundled-codex` to force the bundled CLI for comparison or recovery
 - launch the self-contained Electron runtime from the app directory
 - pass Wayland flags when appropriate
+- avoid `--no-sandbox`; configure `chrome-sandbox` ownership and mode instead
 
 ## Desktop entry requirements
 
