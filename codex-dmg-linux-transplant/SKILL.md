@@ -20,6 +20,7 @@ Use this skill when Codex Desktop must be installed or updated on Linux from a m
 6. **Do not finish until the installed wrapper actually launches.** A staged build is not enough.
 7. **No side-by-side versioned launchers** unless the user explicitly asks for them.
 8. **DMG source order:** user path → safe search → default URL `https://persistent.oaistatic.com/codex-app-prod/Codex.dmg`.
+9. **Do not bypass Chromium sandboxing.** If `chrome-sandbox` needs root ownership, ask the human to run the required `sudo chown` and `sudo chmod 4755` commands.
 
 ## Required reading order
 
@@ -64,6 +65,11 @@ Bootstrap Electron:
 ./scripts/bootstrap-electron-runtime.sh /tmp/codex-stage <electron-version>
 ```
 
+If npm lifecycle-script hardening leaves the Electron runtime binary missing,
+review the script's warning and rerun only that bootstrap command with
+`CODEX_TRANSPLANT_RUN_ELECTRON_INSTALL_JS=1`. This opt-in executes Electron's
+package-local `install.js`; do not disable global npm safeguards.
+
 Install a Linux Codex CLI into the bundle:
 
 ```bash
@@ -84,6 +90,8 @@ Run:
 ```
 
 This now also applies the desktop flag patch automatically.
+
+The generated wrapper uses the user's local `codex` by default when available. Pass `--bundled-codex` to force the bundled Linux CLI installed into the app directory.
 
 ### 6) Verify the real install
 Verification is mandatory:

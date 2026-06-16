@@ -59,11 +59,38 @@ set -euo pipefail
 
 export ELECTRON_FORCE_IS_PACKAGED=1
 
-local_cli="$HOME/.local/opt/codex-desktop/cli/node_modules/.bin/codex"
-if [[ -x "$local_cli" ]]; then
-  export CODEX_CLI_PATH="$local_cli"
-elif [[ -z "${CODEX_CLI_PATH-}" ]] && command -v codex >/dev/null 2>&1; then
+bundled_cli="$HOME/.local/opt/codex-desktop/cli/node_modules/.bin/codex"
+use_bundled_cli=false
+app_args=()
+for arg in "$@"; do
+  case "$arg" in
+    --bundled-codex)
+      use_bundled_cli=true
+      ;;
+    *)
+      app_args+=("$arg")
+      ;;
+  esac
+done
+set -- "${app_args[@]}"
+
+# Resolve the Codex CLI policy before Electron starts so the app-server child uses the intended binary.
+if [[ "$use_bundled_cli" == true ]]; then
+  export CODEX_CLI_PATH="$bundled_cli"
+elif [[ -n "${CODEX_CLI_PATH-}" && -x "$CODEX_CLI_PATH" ]]; then
+  export CODEX_CLI_PATH
+elif command -v codex >/dev/null 2>&1; then
   export CODEX_CLI_PATH="$(command -v codex)"
+else
+  for candidate in "$HOME"/.nvm/versions/node/*/bin/codex "$HOME/.local/bin/codex"; do
+    if [[ -x "$candidate" ]]; then
+      export CODEX_CLI_PATH="$candidate"
+      break
+    fi
+  done
+  if [[ -z "${CODEX_CLI_PATH-}" && -x "$bundled_cli" ]]; then
+    export CODEX_CLI_PATH="$bundled_cli"
+  fi
 fi
 
 extra_flags=()
