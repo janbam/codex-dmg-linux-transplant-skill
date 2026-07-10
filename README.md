@@ -1,34 +1,25 @@
-# Codex DMG Linux Transplant Skill
+# ChatGPT Desktop DMG Linux Transplant Skill
 
-This skill installs or updates **Codex Desktop on Linux from `Codex.dmg`** when no official Linux build exists.
+OpenAI renamed the Codex desktop app to ChatGPT and folded Chat, ChatGPT Work, and Codex into one app. This skill transplants that macOS app to Linux when no official Linux build is available.
 
-It is designed for two cases:
+It handles fresh installs, updates, and migration from an older transplanted Codex build. The visible desktop entry is **ChatGPT**, while the stable local paths and `codex://` protocol remain unchanged for compatibility with upstream internals.
 
-- fresh install on a machine with no Codex desktop app
-- updating an existing transplanted install to a newer DMG build
+The skill:
 
-What it does:
+- finds a local DMG or downloads the current `ChatGPT.dmg`
+- discovers either the old `Codex.app` or new `ChatGPT.app` bundle layout
+- reads the app, Electron, build, and native dependency versions from the DMG
+- extracts the default ChatGPT icon plus external plugin and skill resources
+- removes unusable macOS binaries from copied plugin resources
+- installs a Linux Electron runtime and bundled Codex CLI
+- rebuilds `better-sqlite3` and `node-pty` for Linux
+- patches recognized desktop UI flags
+- replaces the main install instead of creating versioned copies
+- verifies the final wrapper rather than stopping at a staged build
 
-- checks the current system first
-- finds a local DMG or uses the default Codex DMG URL
-- extracts the app metadata and default app icon from the DMG
-- prepares a Linux desktop install
-- installs Codex as the **main desktop version**, not as a side-by-side extra copy
-- bundles a Linux Codex CLI path instead of assuming one already exists
-- automatically patches the transplanted app to force-enable desktop UI flags
-- verifies that the installed wrapper actually launches
+Default sources:
 
-Desktop flag patching currently targets:
+- DMG: `https://persistent.oaistatic.com/codex-app-prod/ChatGPT.dmg`
+- release feed: `https://persistent.oaistatic.com/codex-app-prod/appcast.xml`
 
-- avatar overlay
-- ambient suggestions
-- artifacts pane
-- browser pane
-- multi-window
-- projectless threads
-
-Default DMG source:
-
-- `https://persistent.oaistatic.com/codex-app-prod/Codex.dmg`
-
-Everything else is documented inside the skill files.
+Tested against ChatGPT Desktop **26.707.31428** (build **5059**, Electron **42.1.0**), published July 9, 2026. The old `Codex.dmg` layout remains supported.

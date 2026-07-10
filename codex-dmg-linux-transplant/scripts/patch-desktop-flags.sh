@@ -202,9 +202,8 @@ if func_start_line is None or func_name is None:
 
 func_end_line = None
 for idx in range(func_start_line + 1, len(lines)):
-    stripped = lines[idx].strip()
-    if stripped.startswith('function ') and stripped.endswith('{'):
-        func_end_line = idx
+    if lines[idx].startswith('}') and lines[idx].strip() == '}':
+        func_end_line = idx + 1
         break
 
 if func_end_line is None:
@@ -215,22 +214,16 @@ if '(0, Z.useEffect)' not in original_region or 'browserPane' not in original_re
     if not re.search(r"\(0,\s*[A-Za-z_$][A-Za-z0-9_$]*\.useEffect\)", original_region):
         raise SystemExit('desktop feature function candidate failed validation')
 
-cache_match = re.search(r"let\s+\w+\s*=\s*\(0,\s*([A-Za-z_$][A-Za-z0-9_$]*)\.c\)\(\d+\)", original_region)
 effect_match = re.search(r"\(0,\s*([A-Za-z_$][A-Za-z0-9_$]*)\.useEffect\)", original_region)
-if cache_match is None or effect_match is None:
-    raise SystemExit('failed to identify React compiler helpers in desktop feature function')
-cache_object = cache_match.group(1)
+if effect_match is None:
+    raise SystemExit('failed to identify React useEffect helper in desktop feature function')
 effect_object = effect_match.group(1)
 
 feature_order = [
     'avatarOverlay',
     'ambientSuggestions',
     'artifactsPane',
-    'browserAgent',
-    'browserAgentAvailable',
     'browserPane',
-    'computerUse',
-    'control',
     'multiWindow',
     'projectlessThreads',
 ]
@@ -240,25 +233,13 @@ if 'browserPane' not in active_features:
 
 feature_lines = '\n'.join(f'            {name}: t,' for name in active_features)
 dispatch_block = f"""function __FORCED_DESKTOP_FLAGS__() {{
-  let e = (0, {cache_object}.c)(4),
-    t = !0,
-    n,
-    r;
-  return (
-    e[0] !== t
-      ? ((n = () => {{
-          {dispatch_object}.dispatchMessage(`electron-desktop-features-changed`, {{
+  let t = !0;
+  (0, {effect_object}.useEffect)(() => {{
+    {dispatch_object}.dispatchMessage(`electron-desktop-features-changed`, {{
 {feature_lines}
-          }});
-        }}),
-        (r = [t]),
-        (e[0] = t),
-        (e[1] = n),
-        (e[2] = r))
-      : ((n = e[1]), (r = e[2])),
-    (0, {effect_object}.useEffect)(n, r),
-    null
-  );
+    }});
+  }}, []);
+  return null;
 }}"""
 
 replacement = dispatch_block.replace('__FORCED_DESKTOP_FLAGS__', func_name)

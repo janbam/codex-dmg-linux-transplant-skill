@@ -1,60 +1,70 @@
 # Workflow
 
-This skill installs or updates Codex Desktop on Linux from `Codex.dmg` without assuming any preexisting Codex desktop app.
+The Codex desktop app was renamed to ChatGPT in July 2026. Upstream changed the DMG and `.app` names, but retained `com.openai.codex`, the `codex://` scheme, the Codex CLI contract, and Codex-oriented package metadata.
 
 ## Goal
 
-Produce one main install at:
+Produce one ChatGPT-branded install at the stable compatibility paths:
 
 - `~/.local/opt/codex-desktop`
 - `~/.local/bin/codex-desktop`
 - `~/.local/share/applications/codex-desktop.desktop`
 
-## Source resolution order
+## Confirm the current release
 
-1. User-provided DMG path
-2. Safe local search, for example:
-   - `~/Downloads`
-   - `~/Downloads/00-inbox`
-3. Default URL:
-   - `https://persistent.oaistatic.com/codex-app-prod/Codex.dmg`
+Read the first `<item>` from:
+
+```text
+https://persistent.oaistatic.com/codex-app-prod/appcast.xml
+```
+
+The feed is the release authority. The static DMG URL is rolling and does not include a version in its filename.
+
+## Source order
+
+1. User-provided `.dmg`
+2. Safe local search in `~/Downloads` and `~/Downloads/00-inbox`
+3. `https://persistent.oaistatic.com/codex-app-prod/ChatGPT.dmg`
 
 ## End-to-end sequence
 
-1. Probe the machine with `../scripts/probe-system.sh`
-2. Install missing prerequisites with `../scripts/ensure-prereqs.sh`
-3. Resolve the DMG path
+1. Run `../scripts/probe-system.sh`
+2. Run `../scripts/ensure-prereqs.sh`
+3. Resolve the DMG
 4. Extract metadata with `../scripts/extract-codex-dmg-metadata.py`
-5. Extract `app.asar`, `app.asar.unpacked`, and the default app icon with `../scripts/extract-codex-dmg-assets.py`
-6. Bootstrap a self-contained Electron runtime with `../scripts/bootstrap-electron-runtime.sh`
-7. Install a Linux Codex CLI into the bundle with `../scripts/install-codex-cli.sh`
-8. Rebuild Linux-native modules with `../scripts/rebuild-native-modules.sh`
-9. Write the main install layout with `../scripts/write-main-install.sh`
-10. Automatically patch desktop-only renderer flags during install
-11. Launch the installed wrapper and verify it works
-12. Remove stale versioned launchers and old shims after verification
+5. Extract the app, icon, plugins, and skills with `../scripts/extract-codex-dmg-assets.py`
+6. Bootstrap Electron with the extracted version
+7. Install a bundled Linux Codex CLI
+8. Rebuild Linux-native modules
+9. Write the main install with `../scripts/write-main-install.sh`
+10. Patch recognized desktop flags
+11. Launch the final wrapper and verify it
+12. Remove stale versioned launchers only after verification
 
 ## Staging layout
 
 ```text
 /tmp/codex-stage/
 ├── cli/
-│   └── node_modules/
 ├── electron/
-│   └── node_modules/electron/
 ├── icon.png
 └── resources/
     ├── app.asar
-    └── app.asar.unpacked/
-        └── node_modules/
+    ├── app.asar.unpacked/
+    ├── plugins/              # when present in the DMG
+    └── skills/               # when present in the DMG
 ```
 
-## Verification checklist
+The asset extractor removes `.app`, `.dSYM`, and Mach-O files from copied plugin and skill trees. Keep Linux prebuilds and portable JS/data.
 
-- Wrapper launches from `~/.local/bin/codex-desktop`
-- Desktop entry points to the wrapper
-- Desktop entry uses the extracted default Codex icon
-- The install contains a local Linux Codex CLI path
-- `resources/app.asar` matches the new DMG build
-- `resources/app.asar.unpacked` contains Linux-native modules
-- Old versioned launchers are removed unless explicitly requested
+## Verification
+
+- wrapper launches from `~/.local/bin/codex-desktop`
+- desktop entry displays `ChatGPT`
+- icon matches the DMG's `CFBundleIconFile`
+- bundled Linux Codex CLI is present
+- `app.asar` matches the new build
+- native modules are Linux binaries for the target Electron ABI
+- plugin and skill trees are present when supplied upstream
+- Electron's runtime resource directory links to those plugin and skill trees
+- old versioned launchers are gone unless requested

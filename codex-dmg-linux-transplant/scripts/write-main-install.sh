@@ -39,14 +39,33 @@ if [[ -d "$final_dir" ]]; then
   mv "$final_dir" "$backup_dir"
 fi
 mv "$stage_dir" "$final_dir"
+
+runtime_resources="$final_dir/electron/node_modules/electron/dist/resources"
+mkdir -p "$runtime_resources"
+for resource_name in plugins skills; do
+  if [[ -d "$final_dir/resources/$resource_name" ]]; then
+    rm -rf "$runtime_resources/$resource_name"
+    ln -s "$final_dir/resources/$resource_name" "$runtime_resources/$resource_name"
+  fi
+done
+
+if ! "$script_dir/patch-desktop-flags.sh" "$final_dir"; then
+  rm -rf "$final_dir"
+  if [[ -d "$backup_dir" ]]; then
+    mv "$backup_dir" "$final_dir"
+  fi
+  echo 'desktop flag patch failed; restored the previous install' >&2
+  exit 1
+fi
+
 install -Dm644 "$final_dir/icon.png" "$icon_path"
 
 cat > "$final_dir/package.json" <<EOF
 {
   "name": "openai-codex-electron-linux-shim",
-  "productName": "Codex",
+  "productName": "ChatGPT",
   "version": "${app_version}",
-  "description": "OpenAI Codex Desktop Linux transplant from DMG",
+  "description": "OpenAI ChatGPT Desktop Linux transplant from DMG",
   "main": "resources/app.asar",
   "codexBuildFlavor": "prod",
   "codexBuildNumber": "${build_number}"
@@ -60,6 +79,7 @@ set -euo pipefail
 export ELECTRON_FORCE_IS_PACKAGED=1
 export BUILD_FLAVOR="${BUILD_FLAVOR:-prod}"
 export CODEX_BUILD_NUMBER="${CODEX_BUILD_NUMBER:-__CODEX_BUILD_NUMBER__}"
+export CODEX_ELECTRON_RESOURCES_PATH="$HOME/.local/opt/codex-desktop/resources"
 
 local_cli="$HOME/.local/opt/codex-desktop/cli/node_modules/.bin/codex"
 if [[ -x "$local_cli" ]]; then
@@ -90,17 +110,15 @@ chmod +x "$wrapper_path"
 cat > "$desktop_path" <<EOF
 [Desktop Entry]
 Type=Application
-Name=Codex
-Comment=OpenAI Codex Desktop
+Name=ChatGPT
+Comment=ChatGPT Desktop with Codex
 Exec=${wrapper_path} %U
 Terminal=false
 Categories=Development;
 Icon=${icon_path}
-StartupWMClass=Codex
+StartupWMClass=ChatGPT
 MimeType=x-scheme-handler/codex;
 EOF
-
-"$script_dir/patch-desktop-flags.sh" "$final_dir"
 
 find "$HOME/.local/bin" -maxdepth 1 -type f -name 'codex-desktop-*' -delete
 find "$HOME/.local/share/applications" -maxdepth 1 -type f -name 'codex-desktop-*.desktop' -delete

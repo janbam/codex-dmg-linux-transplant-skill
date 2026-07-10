@@ -1,8 +1,8 @@
 # System Checks
 
-Always inspect the machine before planning the transplant.
+Inspect the machine before planning the transplant.
 
-## Required probes
+## Probe
 
 Run:
 
@@ -10,62 +10,43 @@ Run:
 ../scripts/probe-system.sh
 ```
 
-That probe should confirm:
+Confirm:
 
-- OS and distro from `/etc/os-release`
-- architecture from `uname -m`
-- available package manager(s)
-- required tools:
-  - `python3`
-  - `node`
-  - `npm`
-  - `git`
-  - `curl`
-  - `7z`
-- build tools:
-  - `gcc`
-  - `g++`
-  - `make`
-- Python packaging support for installing Pillow if needed
-- existing Electron binaries, if any
-- existing Codex launchers, desktop files, and install directories
+- distro and architecture
+- package manager
+- `python3`, `node`, `npm`, `git`, `curl`, and `7z`
+- `gcc`, `g++`, and `make`
+- Python packaging support for Pillow
+- existing Electron binaries
+- existing Codex or ChatGPT launchers, desktop files, and install directories
 
-## Prerequisite install step
-
-After probing, run:
+Then run:
 
 ```bash
 ../scripts/ensure-prereqs.sh
 ```
 
-This should install missing dependencies for supported distros before the transplant proceeds.
+Do not continue without Python, Node/npm, 7-Zip, and a working C/C++ toolchain.
 
-## Fail-fast rules
+## Existing install search
 
-Do not continue until these exist:
+Inspect:
 
-- `python3`
-- `node`
-- `npm`
-- `7z`
-- a working C/C++ toolchain for native rebuilds
-
-## Existing install inspection
-
-The user asked for a single main desktop version. Check and later clean up:
-
-- `~/.local/bin/codex-desktop*`
+- `~/.local/bin/*codex*` and `~/.local/bin/*chatgpt*`
 - `~/.local/share/applications/*codex*.desktop`
+- `~/.local/share/applications/*chatgpt*.desktop`
 - `~/.local/opt/codex-desktop*`
-- `/opt/codex-desktop*`
-- `/usr/bin/codex-desktop`
+- `/opt/*codex*`, `/opt/*chatgpt*`, and matching `/usr/bin` entries
 
-## DMG asset requirement
+The final result should still be one main install, not parallel Codex and ChatGPT copies.
 
-The transplant must extract both:
+## DMG requirements
 
-- `app.asar`
-- `app.asar.unpacked`
-- the default Codex icon from the DMG
+The extractor must find one top-level Electron `.app` containing:
 
-Do not ship a placeholder icon.
+- `Info.plist`
+- `Resources/app.asar`
+- `Resources/app.asar.unpacked`
+- the icon named by `CFBundleIconFile`
+
+Current ChatGPT builds also supply `Resources/plugins` and `Resources/skills`; preserve their portable contents.
