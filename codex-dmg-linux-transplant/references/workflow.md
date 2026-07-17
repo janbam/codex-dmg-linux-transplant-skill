@@ -64,7 +64,7 @@ The asset extractor removes `.app`, `.dSYM`, and Mach-O files from copied plugin
 - Wrapper launches from `~/.local/bin/codex-desktop`
 - Desktop entry points to the wrapper
 - Desktop entry displays `ChatGPT` and uses the icon named by the DMG
-- The install contains a local Linux Codex CLI path
+- The wrapper uses bundled Codex by default and selects `~/.local/bin/codex-fork` only with `--use-fork`
 - `resources/app.asar` matches the new DMG build
 - `resources/app.asar.unpacked` contains Linux-native modules
 - Plugin and skill trees are present when supplied upstream and exposed under Electron's runtime resource directory

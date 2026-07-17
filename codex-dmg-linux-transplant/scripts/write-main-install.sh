@@ -23,7 +23,7 @@ if [[ ! -f "$stage_dir/resources/app.asar" ]]; then
   exit 1
 fi
 
-if [[ ! -x "$stage_dir/cli/node_modules/.bin/codex" ]]; then
+if [[ ! -f "$stage_dir/cli/node_modules/.bin/codex" || ! -x "$stage_dir/cli/node_modules/.bin/codex" ]]; then
   echo 'stage_dir is missing a local Linux codex cli' >&2
   exit 1
 fi
@@ -85,12 +85,19 @@ export CODEX_BUILD_NUMBER="${CODEX_BUILD_NUMBER:-__CODEX_BUILD_NUMBER__}"
 export CODEX_ELECTRON_RESOURCES_PATH="$HOME/.local/opt/codex-desktop/resources"
 
 bundled_cli="$HOME/.local/opt/codex-desktop/cli/node_modules/.bin/codex"
-use_bundled_cli=false
+fork_cli="$HOME/.local/bin/codex-fork"
+use_fork=false
 app_args=()
+
+# Consume wrapper-only CLI selection before forwarding the remaining arguments to Electron.
 for arg in "$@"; do
   case "$arg" in
     --bundled-codex)
-      use_bundled_cli=true
+      echo '--bundled-codex is no longer supported because bundled Codex is the default' >&2
+      exit 2
+      ;;
+    --use-fork)
+      use_fork=true
       ;;
     *)
       app_args+=("$arg")
@@ -99,24 +106,21 @@ for arg in "$@"; do
 done
 set -- "${app_args[@]}"
 
-# Resolve the Codex CLI policy before Electron starts so the app-server child uses the intended binary.
-if [[ "$use_bundled_cli" == true ]]; then
-  export CODEX_CLI_PATH="$bundled_cli"
-elif [[ -n "${CODEX_CLI_PATH-}" && -x "$CODEX_CLI_PATH" ]]; then
-  export CODEX_CLI_PATH
-elif command -v codex >/dev/null 2>&1; then
-  export CODEX_CLI_PATH="$(command -v codex)"
+# Select exactly one known CLI so inherited environment state cannot change desktop behavior.
+if [[ "$use_fork" == true ]]; then
+  selected_cli="$fork_cli"
 else
-  for candidate in "$HOME"/.nvm/versions/node/*/bin/codex "$HOME/.local/bin/codex"; do
-    if [[ -x "$candidate" ]]; then
-      export CODEX_CLI_PATH="$candidate"
-      break
-    fi
-  done
-  if [[ -z "${CODEX_CLI_PATH-}" && -x "$bundled_cli" ]]; then
-    export CODEX_CLI_PATH="$bundled_cli"
-  fi
+  selected_cli="$bundled_cli"
 fi
+if [[ ! -f "$selected_cli" || ! -x "$selected_cli" ]]; then
+  if [[ "$use_fork" == true ]]; then
+    echo "--use-fork requires an executable Codex fork at $selected_cli" >&2
+  else
+    echo "bundled Codex CLI is missing or not executable: $selected_cli" >&2
+  fi
+  exit 1
+fi
+export CODEX_CLI_PATH="$selected_cli"
 
 extra_flags=()
 if [[ -n "${WAYLAND_DISPLAY-}" || "${XDG_SESSION_TYPE-}" == "wayland" ]]; then
