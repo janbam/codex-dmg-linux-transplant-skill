@@ -1,10 +1,8 @@
 # Install Layout
 
-The final install must be the single main Codex Desktop version.
+The final install is one ChatGPT Desktop app at stable Codex-era paths.
 
-## Fixed target paths
-
-Install to:
+## Fixed paths
 
 ```text
 ~/.local/opt/codex-desktop
@@ -13,28 +11,26 @@ Install to:
 ~/.local/share/icons/hicolor/512x512/apps/codex-desktop.png
 ```
 
-## Why fixed paths
-
-Use fixed paths so updates replace the main install instead of creating side-by-side versioned shims.
+Do not rename these during an ordinary update. Upstream still uses Codex internally, and retaining the paths updates existing transplants without creating a second app.
 
 ## Expected app directory
 
 ```text
 ~/.local/opt/codex-desktop/
 ├── cli/
-│   └── node_modules/
 ├── electron/
-│   └── node_modules/electron/
 ├── package.json
 ├── icon.png
 └── resources/
     ├── app.asar
-    └── app.asar.unpacked/
+    ├── app.asar.unpacked/
+    ├── plugins/              # current unified app
+    └── skills/               # current unified app
 ```
 
-## Wrapper requirements
+## Wrapper
 
-The wrapper should:
+The wrapper must:
 
 - set `ELECTRON_FORCE_IS_PACKAGED=1`
 - use an executable `CODEX_CLI_PATH` when one is already set
@@ -42,24 +38,27 @@ The wrapper should:
 - fall back to the bundled Linux Codex CLI if no local CLI is found
 - accept `--bundled-codex` to force the bundled CLI for comparison or recovery
 - launch the self-contained Electron runtime from the app directory
+- set `CODEX_ELECTRON_RESOURCES_PATH` to the transplanted resource directory
+- expose `plugins/` and `skills/` under Electron's runtime resource directory
 - pass Wayland flags when appropriate
 - avoid `--no-sandbox`; configure `chrome-sandbox` ownership and mode instead
 
-## Desktop entry requirements
+## Desktop entry
 
-The desktop file should:
+The desktop file must:
 
 - point to `~/.local/bin/codex-desktop`
-- use the plain app name `Codex`
-- use the extracted default Codex icon
+- display the name `ChatGPT`
+- use the icon extracted from the DMG
+- retain `x-scheme-handler/codex`
 - replace older user-local Codex desktop entries after verification
 
-## Cleanup after successful install
+## Cleanup
 
-After the new install is verified, remove stale items such as:
+After the new install works, remove stale versioned paths:
 
 - `~/.local/bin/codex-desktop-*`
 - `~/.local/share/applications/codex-desktop-*.desktop`
-- old versioned `~/.local/opt/codex-desktop-*` directories
+- `~/.local/opt/codex-desktop-*`
 
-Only keep alternates if the user explicitly asks.
+Keep alternates only when the user asks.

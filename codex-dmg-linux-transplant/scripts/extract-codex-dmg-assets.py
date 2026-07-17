@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
+import plistlib
 import shutil
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
+
+from dmg_layout import find_app_layout
 
 
 def run(cmd):
@@ -22,9 +25,35 @@ def ensure_pillow(target_dir: Path):
         return Image
 
 
+def remove_macos_payloads(root: Path):
+    """Keep cross-platform plugin data without carrying unusable Mach-O binaries."""
+    macho_magics = {
+        b'\xfe\xed\xfa\xce', b'\xce\xfa\xed\xfe',
+        b'\xfe\xed\xfa\xcf', b'\xcf\xfa\xed\xfe',
+        b'\xca\xfe\xba\xbe', b'\xbe\xba\xfe\xca',
+        b'\xca\xfe\xba\xbf', b'\xbf\xba\xfe\xca',
+    }
+    for app_bundle in root.rglob('*.app'):
+        if app_bundle.is_dir():
+            shutil.rmtree(app_bundle)
+    for debug_bundle in root.rglob('*.dSYM'):
+        if debug_bundle.is_dir():
+            shutil.rmtree(debug_bundle)
+    for path in root.rglob('*'):
+        if not path.is_file():
+            continue
+        try:
+            with path.open('rb') as file:
+                magic = file.read(4)
+        except OSError:
+            continue
+        if magic in macho_magics:
+            path.unlink()
+
+
 def main():
     if len(sys.argv) != 3:
-        raise SystemExit('usage: extract-codex-dmg-assets.py /path/to/Codex.dmg /path/to/stage-dir')
+        raise SystemExit('usage: extract-codex-dmg-assets.py /path/to/ChatGPT.dmg /path/to/stage-dir')
 
     dmg = Path(sys.argv[1]).expanduser().resolve()
     stage = Path(sys.argv[2]).expanduser().resolve()
@@ -38,13 +67,28 @@ def main():
 
     with tempfile.TemporaryDirectory() as td:
         out = Path(td)
-        run(['7z', 'x', str(dmg), '-ir!Codex Installer/Codex.app/Contents/Resources/app.asar', '-y', f'-o{out}'])
-        run(['7z', 'x', str(dmg), '-ir!Codex Installer/Codex.app/Contents/Resources/app.asar.unpacked', '-y', f'-o{out}'])
-        run(['7z', 'x', str(dmg), '-ir!Codex Installer/Codex.app/Contents/Resources/electron.icns', '-y', f'-o{out}'])
+        # Discover the bundle and its declared icon without coupling extraction to either brand name.
+        layout = find_app_layout(str(dmg))
+        run(['7z', 'x', str(dmg), f'-ir!{layout.info_plist}', '-y', f'-o{out}'])
+        info_path = out / Path(layout.info_plist)
+        info = plistlib.load(info_path.open('rb'))
+        icon_name = info.get('CFBundleIconFile') or 'electron.icns'
+        if not Path(icon_name).suffix:
+            icon_name += '.icns'
 
-        app_asar = out / 'Codex Installer' / 'Codex.app' / 'Contents' / 'Resources' / 'app.asar'
-        app_asar_unpacked = out / 'Codex Installer' / 'Codex.app' / 'Contents' / 'Resources' / 'app.asar.unpacked'
-        icns = out / 'Codex Installer' / 'Codex.app' / 'Contents' / 'Resources' / 'electron.icns'
+        includes = [
+            f'{layout.resources}/app.asar',
+            f'{layout.resources}/app.asar.unpacked',
+            f'{layout.resources}/{icon_name}',
+            f'{layout.resources}/plugins',
+            f'{layout.resources}/skills',
+        ]
+        run(['7z', 'x', str(dmg), *(f'-ir!{path}' for path in includes), '-y', f'-o{out}'])
+
+        resources = out / Path(layout.resources)
+        app_asar = resources / 'app.asar'
+        app_asar_unpacked = resources / 'app.asar.unpacked'
+        icns = resources / icon_name
         if not app_asar.exists():
             raise SystemExit('failed to extract app.asar from dmg')
         if not app_asar_unpacked.is_dir():
@@ -57,6 +101,15 @@ def main():
         stage_app_asar_unpacked = stage / 'resources' / 'app.asar.unpacked'
         shutil.rmtree(stage_app_asar_unpacked, ignore_errors=True)
         shutil.copytree(app_asar_unpacked, stage_app_asar_unpacked)
+
+        # Keep portable external resources while stripping binaries that cannot execute on Linux.
+        for resource_dir in ('plugins', 'skills'):
+            source = resources / resource_dir
+            if source.is_dir():
+                target = stage / 'resources' / resource_dir
+                shutil.rmtree(target, ignore_errors=True)
+                shutil.copytree(source, target)
+                remove_macos_payloads(target)
         shutil.copy2(icns, stage / 'icon.icns')
 
         Image = ensure_pillow(stage / '.python-deps')

@@ -23,8 +23,9 @@ fi
 
 npm install --prefix "$stage_dir/electron" --no-save "electron@${electron_version}"
 
-electron_bin="$stage_dir/electron/node_modules/electron/dist/electron"
-electron_install_js="$stage_dir/electron/node_modules/electron/install.js"
+electron_pkg="$stage_dir/electron/node_modules/electron"
+electron_bin="$electron_pkg/dist/electron"
+electron_install_js="$electron_pkg/install.js"
 
 # Recover the runtime payload only after an explicit narrow opt-in.
 if [[ ! -x "$electron_bin" ]]; then
@@ -38,7 +39,7 @@ if [[ ! -x "$electron_bin" ]]; then
     echo "  CODEX_TRANSPLANT_RUN_ELECTRON_INSTALL_JS=1 $0 $stage_dir $electron_version" >&2
     exit 1
   fi
-  node "$electron_install_js"
+  (cd "$electron_pkg" && node install.js)
 fi
 
 if [[ ! -x "$electron_bin" ]]; then

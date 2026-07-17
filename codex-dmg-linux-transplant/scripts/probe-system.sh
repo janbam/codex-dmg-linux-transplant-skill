@@ -48,13 +48,13 @@ done
 
 echo
 echo '== codex-cli =='
-for cmd in codex codex-desktop; do
+for cmd in codex codex-desktop chatgpt-desktop; do
   if command -v "$cmd" >/dev/null 2>&1; then
     printf 'found %s -> %s\n' "$cmd" "$(command -v "$cmd")"
   fi
 done
 
 echo
-echo '== existing-codex-artifacts =='
+echo '== existing-codex-chatgpt-artifacts =='
 find "$HOME/.local/bin" "$HOME/.local/share/applications" "$HOME/.local/opt" /opt /usr/bin \
-  \( -iname '*codex*' -o -iname 'codex-desktop*' \) 2>/dev/null | sort -u || true
+  \( -iname '*codex*' -o -iname '*chatgpt*' \) 2>/dev/null | sort -u || true

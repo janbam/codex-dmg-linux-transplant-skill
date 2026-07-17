@@ -9,6 +9,12 @@ fi
 app_dir="$1"
 asar_path="$app_dir/resources/app.asar"
 unpacked_dir="$app_dir/resources/app.asar.unpacked"
+python_bin="${PYTHON_BIN:-python3}"
+
+if ! command -v "$python_bin" >/dev/null 2>&1; then
+  echo "missing required Python interpreter: $python_bin" >&2
+  exit 1
+fi
 
 if [[ ! -f "$asar_path" ]]; then
   echo "missing app.asar: $asar_path" >&2
@@ -29,9 +35,9 @@ trap cleanup EXIT
 extract_dir="$tmp_dir/extracted"
 mkdir -p "$extract_dir"
 
-# Materialize absent unpacked references once so asar extraction does not retry
+# Materialize absent unpacked references once so ASAR extraction does not retry
 # hundreds of times for macOS-only files that the Linux transplant never uses.
-python3 - <<'PY' "$asar_path" "$unpacked_dir"
+"$python_bin" - <<'PY' "$asar_path" "$unpacked_dir"
 import json
 import pathlib
 import sys
@@ -86,7 +92,7 @@ while true; do
     exit 1
   fi
 
-  missing_path="$(python3 - <<'PY' "$extract_err"
+  missing_path="$("$python_bin" - <<'PY' "$extract_err"
 import pathlib, re, sys
 text = pathlib.Path(sys.argv[1]).read_text(errors='ignore')
 m = re.search(r"ENOENT: .* open '([^']+app\.asar\.unpacked[^']+)'", text)
@@ -108,7 +114,7 @@ PY
   esac
 done
 
-target_js="$(node - <<'PY' "$extract_dir"
+if ! target_js="$(node - <<'PY' "$extract_dir"
 const fs = require('fs');
 const path = require('path');
 
@@ -135,7 +141,10 @@ while (stack.length) {
 }
 process.exit(1);
 PY
-)"
+)"; then
+  echo 'desktop flag patch skipped: renderer bundle pattern was not found' >&2
+  exit 0
+fi
 
 if [[ -z "$target_js" || ! -f "$target_js" ]]; then
   echo 'missing renderer bundle with desktop feature flags in extracted app' >&2
@@ -145,7 +154,7 @@ fi
 pretty_js="$tmp_dir/index.pretty.js"
 npx --yes prettier "$target_js" > "$pretty_js"
 
-python3 - <<'PY' "$pretty_js"
+"$python_bin" - <<'PY' "$pretty_js"
 from pathlib import Path
 import re
 import sys
@@ -193,9 +202,8 @@ if func_start_line is None or func_name is None:
 
 func_end_line = None
 for idx in range(func_start_line + 1, len(lines)):
-    stripped = lines[idx].strip()
-    if stripped.startswith('function ') and stripped.endswith('{'):
-        func_end_line = idx
+    if lines[idx].startswith('}') and lines[idx].strip() == '}':
+        func_end_line = idx + 1
         break
 
 if func_end_line is None:
@@ -206,22 +214,16 @@ if '(0, Z.useEffect)' not in original_region or 'browserPane' not in original_re
     if not re.search(r"\(0,\s*[A-Za-z_$][A-Za-z0-9_$]*\.useEffect\)", original_region):
         raise SystemExit('desktop feature function candidate failed validation')
 
-cache_match = re.search(r"let\s+\w+\s*=\s*\(0,\s*([A-Za-z_$][A-Za-z0-9_$]*)\.c\)\(\d+\)", original_region)
 effect_match = re.search(r"\(0,\s*([A-Za-z_$][A-Za-z0-9_$]*)\.useEffect\)", original_region)
-if cache_match is None or effect_match is None:
-    raise SystemExit('failed to identify React compiler helpers in desktop feature function')
-cache_object = cache_match.group(1)
+if effect_match is None:
+    raise SystemExit('failed to identify React useEffect helper in desktop feature function')
 effect_object = effect_match.group(1)
 
 feature_order = [
     'avatarOverlay',
     'ambientSuggestions',
     'artifactsPane',
-    'browserAgent',
-    'browserAgentAvailable',
     'browserPane',
-    'computerUse',
-    'control',
     'multiWindow',
     'projectlessThreads',
 ]
@@ -231,25 +233,13 @@ if 'browserPane' not in active_features:
 
 feature_lines = '\n'.join(f'            {name}: t,' for name in active_features)
 dispatch_block = f"""function __FORCED_DESKTOP_FLAGS__() {{
-  let e = (0, {cache_object}.c)(4),
-    t = !0,
-    n,
-    r;
-  return (
-    e[0] !== t
-      ? ((n = () => {{
-          {dispatch_object}.dispatchMessage(`electron-desktop-features-changed`, {{
+  let t = !0;
+  (0, {effect_object}.useEffect)(() => {{
+    {dispatch_object}.dispatchMessage(`electron-desktop-features-changed`, {{
 {feature_lines}
-          }});
-        }}),
-        (r = [t]),
-        (e[0] = t),
-        (e[1] = n),
-        (e[2] = r))
-      : ((n = e[1]), (r = e[2])),
-    (0, {effect_object}.useEffect)(n, r),
-    null
-  );
+    }});
+  }}, []);
+  return null;
 }}"""
 
 replacement = dispatch_block.replace('__FORCED_DESKTOP_FLAGS__', func_name)

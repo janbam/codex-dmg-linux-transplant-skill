@@ -33,18 +33,16 @@ if [[ ! "$electron_major" =~ ^[0-9]+$ ]]; then
   echo "invalid electron version: $electron_version" >&2
   exit 1
 fi
+
 if (( electron_major >= 42 )); then
-python3 - <<'PY' "$build_dir/node_modules/better-sqlite3"
+  python3 - <<'PY' "$build_dir/node_modules/better-sqlite3"
 from pathlib import Path
 import sys
 
 module_dir = Path(sys.argv[1])
-macros_path = module_dir / 'src/util/macros.cpp'
-helpers_path = module_dir / 'src/util/helpers.cpp'
-addon_path = module_dir / 'src/better_sqlite3.cpp'
-
 
 def replace_once_or_verify(path, old, new):
+    """Apply one source adaptation while accepting an already-patched file."""
     text = path.read_text()
     if new in text:
         return
@@ -52,41 +50,66 @@ def replace_once_or_verify(path, old, new):
         raise SystemExit(f'failed to patch unexpected better-sqlite3 source: {path}')
     path.write_text(text.replace(old, new, 1))
 
-
-macros_text = macros_path.read_text()
-if 'EXTERNAL_NEW(' not in macros_text or 'EXTERNAL_VALUE(' not in macros_text:
-    # Add the Electron 42 external-pointer helpers to older better-sqlite3 sources.
-    replace_once_or_verify(
-        macros_path,
-        '#define OnlyAddon static_cast<Addon*>(info.Data().As<v8::External>()->Value())',
-        '''#if defined(NODE_MODULE_VERSION) && NODE_MODULE_VERSION >= 146
+# Normalize both legacy sources and partially patched releases to V8's named pointer tag.
+macros = module_dir / 'src/util/macros.cpp'
+macros_text = macros.read_text()
+if 'v8::kExternalPointerTypeTagDefault' not in macros_text:
+    if '#define EXTERNAL_NEW(isolate, value) v8::External::New((isolate), (value), 0)' in macros_text:
+        macros_text = macros_text.replace(
+            '#define EXTERNAL_NEW(isolate, value) v8::External::New((isolate), (value), 0)',
+            '#define EXTERNAL_NEW(isolate, value) v8::External::New((isolate), (value), v8::kExternalPointerTypeTagDefault)',
+            1,
+        )
+        macros_text = macros_text.replace(
+            '#define EXTERNAL_VALUE(value) (value)->Value(0)',
+            '#define EXTERNAL_VALUE(value) (value)->Value(v8::kExternalPointerTypeTagDefault)',
+            1,
+        )
+        macros.write_text(macros_text)
+    else:
+        replace_once_or_verify(
+            macros,
+            '#define OnlyAddon static_cast<Addon*>(info.Data().As<v8::External>()->Value())',
+            '''#if defined(NODE_MODULE_VERSION) && NODE_MODULE_VERSION >= 146
 // Preserve the addon pointer behind Electron 42's mandatory V8 sandbox tag.
-#define EXTERNAL_NEW(isolate, value) v8::External::New((isolate), (value), 0)
-#define EXTERNAL_VALUE(value) (value)->Value(0)
+#define OnlyAddon static_cast<Addon*>(info.Data().As<v8::External>()->Value(v8::kExternalPointerTypeTagDefault))
 #else
-#define EXTERNAL_NEW(isolate, value) v8::External::New((isolate), (value))
-#define EXTERNAL_VALUE(value) (value)->Value()
-#endif
-#define OnlyAddon static_cast<Addon*>(EXTERNAL_VALUE(info.Data().As<v8::External>()))''',
-    )
-replace_once_or_verify(
-    helpers_path,
-    '''\t\tfunc,
+#define OnlyAddon static_cast<Addon*>(info.Data().As<v8::External>()->Value())
+#endif''',
+        )
+
+# Replace the legacy null callback with the C++ form expected by current V8 headers.
+helpers = module_dir / 'src/util/helpers.cpp'
+helpers_text = helpers.read_text()
+if '''\t\tfunc,
+\t\t0,
+\t\tdata''' in helpers_text:
+    helpers.write_text(helpers_text.replace(
+        '''\t\tfunc,
 \t\t0,
 \t\tdata''',
-    '''\t\tfunc,
+        '''\t\tfunc,
 \t\tnullptr,
 \t\tdata''',
-)
-addon_text = addon_path.read_text()
-macros_text = macros_path.read_text()
-if 'EXTERNAL_NEW(' not in macros_text or 'EXTERNAL_VALUE(' not in macros_text:
-    raise SystemExit(f'better-sqlite3 external helpers were not installed: {macros_path}')
-if 'EXTERNAL_NEW(isolate, addon)' not in addon_text:
+        1,
+    ))
+elif '''\t\tfunc,
+\t\tnullptr,
+\t\tdata''' not in helpers_text:
+    raise SystemExit(f'failed to patch unexpected better-sqlite3 source: {helpers}')
+
+# Patch direct external construction only when the package does not route it through helpers.
+better_sqlite = module_dir / 'src/better_sqlite3.cpp'
+if 'EXTERNAL_NEW(isolate, addon)' not in better_sqlite.read_text():
     replace_once_or_verify(
-        addon_path,
+        better_sqlite,
         '\tv8::Local<v8::External> data = v8::External::New(isolate, addon);',
-        '\tv8::Local<v8::External> data = EXTERNAL_NEW(isolate, addon);',
+        '''\t#if defined(NODE_MODULE_VERSION) && NODE_MODULE_VERSION >= 146
+\t// Preserve the addon pointer behind Electron 42's mandatory V8 sandbox tag.
+\tv8::Local<v8::External> data = v8::External::New(isolate, addon, v8::kExternalPointerTypeTagDefault);
+\t#else
+\tv8::Local<v8::External> data = v8::External::New(isolate, addon);
+\t#endif''',
     )
 PY
 fi
