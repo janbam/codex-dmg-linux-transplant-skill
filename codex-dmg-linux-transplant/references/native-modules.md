@@ -31,7 +31,7 @@ The current unified bundle also contains platform-gated macOS addons and optiona
 
 ## CLI
 
-Install `@openai/codex` into the stage so recovery does not depend on a global command. The wrapper prefers an explicitly configured or user-local `codex`, falls back to the bundled CLI, and exposes `--bundled-codex` to force the bundled binary for comparison or recovery.
+Install `@openai/codex` into the stage and use that bundled Linux CLI by default. The wrapper accepts `--use-fork` to select `~/.local/bin/codex-fork` explicitly; it never copies or executes the macOS CLI from the DMG.
 
 ## Failure handling
 

@@ -33,10 +33,11 @@ Do not rename these during an ordinary update. Upstream still uses Codex interna
 The wrapper must:
 
 - set `ELECTRON_FORCE_IS_PACKAGED=1`
-- use an executable `CODEX_CLI_PATH` when one is already set
-- prefer the user's local `codex` by default when it is available
-- fall back to the bundled Linux Codex CLI if no local CLI is found
-- accept `--bundled-codex` to force the bundled CLI for comparison or recovery
+- use the bundled Linux Codex CLI by default
+- accept `--use-fork` to select `~/.local/bin/codex-fork` for one launch
+- consume `--use-fork` instead of forwarding it to Electron
+- fail clearly when the selected CLI is missing or not executable
+- reject the obsolete `--bundled-codex` selector because bundled Codex is already the default
 - launch the self-contained Electron runtime from the app directory
 - set `CODEX_ELECTRON_RESOURCES_PATH` to the transplanted resource directory
 - expose `plugins/` and `skills/` under Electron's runtime resource directory

@@ -86,14 +86,14 @@ This also patches recognized desktop feature flags and writes a ChatGPT-branded 
 
 Check all of these:
 
-The generated wrapper uses the user's local `codex` by default when available. Pass `--bundled-codex` to force the bundled Linux CLI installed into the app directory.
+The generated wrapper uses the bundled Linux Codex CLI installed into the app directory by default. Pass `--use-fork` to select `~/.local/bin/codex-fork` for that launch.
 
 Verification is mandatory:
 
 - `~/.local/bin/codex-desktop` exists and is executable
 - the desktop entry is named ChatGPT and points to the stable wrapper
 - the icon came from the DMG
-- the wrapper selects an executable Linux Codex CLI, and the bundled fallback is present
+- the wrapper selects bundled Codex by default and selects `codex-fork` only with `--use-fork`
 - the wrapper launches from the final path
 - no stale versioned launchers remain unless requested
 
