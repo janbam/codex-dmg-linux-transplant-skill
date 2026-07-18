@@ -22,7 +22,7 @@ done
 
 echo
 echo '== core-tools =='
-for cmd in python3 node npm git curl 7z bsdtar gcc g++ make; do
+for cmd in python3 node npm git curl 7z bsdtar gcc g++ make xdg-mime update-desktop-database; do
   if command -v "$cmd" >/dev/null 2>&1; then
     printf 'ok %s -> %s\n' "$cmd" "$(command -v "$cmd")"
   else

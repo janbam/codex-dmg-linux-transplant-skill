@@ -29,6 +29,16 @@ This ledger records intentional differences from [`IgorWarzocha/codex-dmg-linux-
 
 - Completion requires successful login and at least one live smoke test from the installed desktop app, not merely a launchable wrapper.
 
+### Desktop URL handling
+
+- Installation and handler-only repair publish the ChatGPT desktop entry through `update-desktop-database`, assign it as the default `codex://` handler through `xdg-mime`, and verify the resulting association.
+- End-to-end verification includes opening the installed app from ChatGPT Web through `codex://threads/new`; declaring the scheme in the desktop file alone is not treated as sufficient.
+- A handler-registration failure preserves the completed app layout and any previous-install backup because association repair is independently retryable without the original stage.
+
+### Prerequisite installation handoff
+
+- `ensure-prereqs.sh` reports missing commands and exits instead of invoking `sudo` or changing root-owned system packages; the human operator owns package installation.
+
 ### Transplant records
 
 - `reports/` contains fork-owned reports for successfully transplanted Codex Desktop builds and the operational lessons folded back into the skill.

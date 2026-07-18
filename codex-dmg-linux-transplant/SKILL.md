@@ -1,6 +1,6 @@
 ---
 name: codex-dmg-linux-transplant
-description: "Install or update the ChatGPT desktop app on Linux from ChatGPT.dmg (formerly Codex.dmg) when no official Linux build exists. Use for fresh installs, DMG updates, Codex-to-ChatGPT migration, or replacing an existing transplanted desktop build with the current release."
+description: "Install, update, or repair the ChatGPT desktop app on Linux from ChatGPT.dmg (formerly Codex.dmg) when no official Linux build exists. Use for fresh installs, DMG updates, Codex-to-ChatGPT migration, replacing an existing transplanted desktop build, or repairing its codex:// deep-link handler."
 ---
 
 # ChatGPT/Codex DMG → Linux Transplant
@@ -23,6 +23,7 @@ Transplant the macOS ChatGPT desktop app—the renamed Codex app—onto Linux. T
 9. **No side-by-side versioned launchers** unless the user asks for them.
 10. **DMG source order:** user path → safe local search → `https://persistent.oaistatic.com/codex-app-prod/ChatGPT.dmg`.
 11. **Do not bypass Chromium sandboxing.** If `chrome-sandbox` needs root ownership, ask the human to run the required `sudo chown` and `sudo chmod 4755` commands.
+12. **Publish the `codex://` handler.** A `MimeType` declaration alone is insufficient; refresh the desktop database, assign the default handler, and verify it.
 
 ## Required reading order
 
@@ -40,6 +41,8 @@ Transplant the macOS ChatGPT desktop app—the renamed Codex app—onto Linux. T
 ./scripts/probe-system.sh
 ./scripts/ensure-prereqs.sh
 ```
+
+If the prerequisite check reports missing commands, stop and ask the human operator to install them. Never invoke `sudo` or mutate system packages from the skill workflow.
 
 ### 2) Resolve the DMG
 
@@ -80,7 +83,9 @@ Install a Linux Codex CLI into the bundle:
 ./scripts/write-main-install.sh /tmp/codex-stage <app-version> <build-number>
 ```
 
-This also patches recognized desktop feature flags and writes a ChatGPT-branded desktop entry.
+This also patches recognized desktop feature flags, writes a ChatGPT-branded desktop entry, publishes it to the desktop MIME database, and makes it the default `codex://` handler.
+
+For an otherwise working install whose browser deep link reports “No Apps available,” skip the transplant rebuild and use the handler-only repair in `references/install-layout.md`.
 
 ### 6) Verify the final install
 
@@ -92,6 +97,8 @@ Verification is mandatory:
 
 - `~/.local/bin/codex-desktop` exists and is executable
 - the desktop entry is named ChatGPT and points to the stable wrapper
+- `xdg-mime query default x-scheme-handler/codex` returns `codex-desktop.desktop`
+- ChatGPT Web opens the installed app through `codex://threads/new`
 - the icon came from the DMG
 - the wrapper selects bundled Codex by default and selects `codex-fork` only with `--use-fork`
 - the wrapper launches from the final path

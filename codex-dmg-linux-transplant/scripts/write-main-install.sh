@@ -12,11 +12,21 @@ build_number="$3"
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 final_dir="$HOME/.local/opt/codex-desktop"
 wrapper_path="$HOME/.local/bin/codex-desktop"
-desktop_path="$HOME/.local/share/applications/codex-desktop.desktop"
+applications_dir="$HOME/.local/share/applications"
+desktop_id="codex-desktop.desktop"
+desktop_path="$applications_dir/$desktop_id"
 icon_path="$HOME/.local/share/icons/hicolor/512x512/apps/codex-desktop.png"
 backup_dir="${final_dir}.backup.$(date +%s)"
 
-mkdir -p "$HOME/.local/opt" "$HOME/.local/bin" "$HOME/.local/share/applications" "$(dirname "$icon_path")"
+# Refuse a partial install when the desktop environment cannot publish the codex:// handler.
+for desktop_tool in xdg-mime update-desktop-database; do
+  if ! command -v "$desktop_tool" >/dev/null 2>&1; then
+    echo "$desktop_tool is required to register the codex:// desktop handler" >&2
+    exit 1
+  fi
+done
+
+mkdir -p "$HOME/.local/opt" "$HOME/.local/bin" "$applications_dir" "$(dirname "$icon_path")"
 
 if [[ ! -f "$stage_dir/resources/app.asar" ]]; then
   echo 'stage_dir is missing resources/app.asar' >&2
@@ -46,7 +56,7 @@ runtime_resources="$final_dir/electron/node_modules/electron/dist/resources"
 mkdir -p "$runtime_resources"
 for resource_name in plugins skills; do
   if [[ -d "$final_dir/resources/$resource_name" ]]; then
-    rm -rf "$runtime_resources/$resource_name"
+    rm -rf "${runtime_resources:?}/$resource_name"
     ln -s "$final_dir/resources/$resource_name" "$runtime_resources/$resource_name"
   fi
 done
@@ -154,8 +164,42 @@ StartupWMClass=ChatGPT
 MimeType=x-scheme-handler/codex;
 EOF
 
+# Commit the installed app layout independently from desktop registration, which is safe to retry in place.
+handler_error=""
+if ! update-desktop-database "$applications_dir"; then
+  handler_error="update-desktop-database failed"
+elif ! xdg-mime default "$desktop_id" x-scheme-handler/codex; then
+  handler_error="xdg-mime could not assign the default handler"
+else
+  registered_handler="$(xdg-mime query default x-scheme-handler/codex || true)"
+  if [[ "$registered_handler" != "$desktop_id" ]]; then
+    handler_error="xdg-mime reported ${registered_handler:-no default handler}"
+  fi
+fi
+
+# Preserve the installed app layout and its backup when only the repairable association failed.
+if [[ -n "$handler_error" ]]; then
+  echo "installed the app, but failed to register the codex:// handler: $handler_error" >&2
+  echo 'run the handler-only repair in references/install-layout.md, then retry from ChatGPT Web' >&2
+  if [[ -d "$backup_dir" ]]; then
+    echo "previous install backup preserved at $backup_dir" >&2
+  fi
+  exit 1
+fi
+
+# Remove stale desktop entries and immediately rebuild the cache so it describes surviving files.
+find "$applications_dir" -maxdepth 1 -type f -name 'codex-desktop-*.desktop' -delete
+if ! update-desktop-database "$applications_dir"; then
+  echo 'installed the app and handler, but failed to refresh the desktop database after stale-entry cleanup' >&2
+  echo 'run the handler-only repair in references/install-layout.md, then retry from ChatGPT Web' >&2
+  if [[ -d "$backup_dir" ]]; then
+    echo "previous install backup preserved at $backup_dir" >&2
+  fi
+  exit 1
+fi
+
+# Remove stale executable and app alternates only after desktop discovery reaches its final state.
 find "$HOME/.local/bin" -maxdepth 1 -type f -name 'codex-desktop-*' -delete
-find "$HOME/.local/share/applications" -maxdepth 1 -type f -name 'codex-desktop-*.desktop' -delete
 find "$HOME/.local/opt" -maxdepth 1 -mindepth 1 -type d -name 'codex-desktop-*' -exec rm -rf {} +
 
 echo "installed to $final_dir"
