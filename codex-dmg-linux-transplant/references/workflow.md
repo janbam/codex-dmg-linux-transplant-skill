@@ -35,7 +35,8 @@ The feed is the release authority. The static DMG URL is rolling and does not in
 5. Extract the app, default icon, plugins, and skills with `../scripts/extract-codex-dmg-assets.py`
 6. Bootstrap a self-contained Electron runtime with `../scripts/bootstrap-electron-runtime.sh`
    - If this reports a missing Electron runtime because lifecycle scripts were blocked, review the warning and rerun the same command with `CODEX_TRANSPLANT_RUN_ELECTRON_INSTALL_JS=1`.
-7. Install a Linux Codex CLI into the bundle with `../scripts/install-codex-cli.sh`
+7. Install the exact `codex_cli_version` reported from the DMG with `../scripts/install-codex-cli.sh <stage-dir> <codex-cli-version>`
+   - This one exact install uses isolated npm configuration files so the operator's release-age and lifecycle gates remain intact everywhere else.
 8. Rebuild Linux-native modules with `../scripts/rebuild-native-modules.sh`
 9. Write the main install layout with `../scripts/write-main-install.sh`
    - The installer patches desktop-only renderer flags.
@@ -64,12 +65,14 @@ The asset extractor removes `.app`, `.dSYM`, and Mach-O files from copied plugin
 ## Verification
 
 - Wrapper launches from `~/.local/bin/codex-desktop`
+- `~/.local/bin/codex-desktop --check-update` reports the installed and latest appcast builds without launching Electron
 - Desktop entry points to the wrapper
 - Desktop entry displays `ChatGPT` and uses the icon named by the DMG
 - `xdg-mime query default x-scheme-handler/codex` returns `codex-desktop.desktop`
 - `gio mime x-scheme-handler/codex`, when available, lists `codex-desktop.desktop` as registered and default
 - ChatGPT Web can open the installed app through `codex://threads/new`
 - The wrapper uses bundled Codex by default and selects `~/.local/bin/codex-fork` only with `--use-fork`
+- The bundled Linux Codex version matches the macOS Codex version reported from the source DMG
 - `resources/app.asar` matches the new DMG build
 - `resources/app.asar.unpacked` contains Linux-native modules
 - Plugin and skill trees are present when supplied upstream and exposed under Electron's runtime resource directory

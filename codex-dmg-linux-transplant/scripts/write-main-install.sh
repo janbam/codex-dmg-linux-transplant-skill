@@ -38,10 +38,20 @@ if [[ ! -f "$stage_dir/cli/node_modules/.bin/codex" || ! -x "$stage_dir/cli/node
   exit 1
 fi
 
+bundled_cli_version="$("$stage_dir/cli/node_modules/.bin/codex" --version)"
+if [[ ! "$bundled_cli_version" =~ ^codex-cli\ ([0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+(\.[0-9A-Za-z]+)*)?)$ ]]; then
+  echo "bundled Codex CLI reported an invalid version: $bundled_cli_version" >&2
+  exit 1
+fi
+bundled_cli_version="${BASH_REMATCH[1]}"
+
 if [[ ! -f "$stage_dir/icon.png" ]]; then
   echo 'stage_dir is missing icon.png extracted from the dmg' >&2
   exit 1
 fi
+
+# Add the read-only release checker while the stage is still safe to abandon on filesystem failure.
+install -m755 "$script_dir/check-desktop-update.py" "$stage_dir/check-desktop-update.py"
 
 rm -rf "$stage_dir/native-build" "$stage_dir/.python-deps"
 
@@ -81,7 +91,8 @@ cat > "$final_dir/package.json" <<EOF
   "description": "OpenAI ChatGPT Desktop Linux transplant from DMG",
   "main": "resources/app.asar",
   "codexBuildFlavor": "prod",
-  "codexBuildNumber": "${build_number}"
+  "codexBuildNumber": "${build_number}",
+  "codexCliVersion": "${bundled_cli_version}"
 }
 EOF
 
@@ -97,6 +108,7 @@ export CODEX_ELECTRON_RESOURCES_PATH="$HOME/.local/opt/codex-desktop/resources"
 bundled_cli="$HOME/.local/opt/codex-desktop/cli/node_modules/.bin/codex"
 fork_cli="$HOME/.local/bin/codex-fork"
 use_fork=false
+check_update=false
 app_args=()
 
 # Consume wrapper-only CLI selection before forwarding the remaining arguments to Electron.
@@ -109,12 +121,24 @@ for arg in "$@"; do
     --use-fork)
       use_fork=true
       ;;
+    --check-update)
+      check_update=true
+      ;;
     *)
       app_args+=("$arg")
       ;;
   esac
 done
 set -- "${app_args[@]}"
+
+# Keep the release check independent from Electron and the bundled CLI so a damaged install can still report its status.
+if [[ "$check_update" == true ]]; then
+  if [[ "$use_fork" == true || $# -ne 0 ]]; then
+    echo '--check-update must be used by itself' >&2
+    exit 2
+  fi
+  exec "$HOME/.local/opt/codex-desktop/check-desktop-update.py"
+fi
 
 # Select exactly one known CLI so inherited environment state cannot change desktop behavior.
 if [[ "$use_fork" == true ]]; then

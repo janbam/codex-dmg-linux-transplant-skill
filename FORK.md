@@ -7,8 +7,18 @@ This ledger records intentional differences from [`IgorWarzocha/codex-dmg-linux-
 ### Codex CLI selection
 
 - The generated desktop wrapper uses the bundled Linux Codex CLI deterministically, ignoring ambient `CODEX_CLI_PATH` and globally installed `codex` commands.
+- The Linux bundle installs the exact CLI version embedded in the source DMG's macOS binary, including prerelease suffixes, instead of resolving npm's latest version.
+- That exact install uses temporary empty npm configuration files to bypass machine-wide release-age and lifecycle gates without changing their durable configuration.
 - `--use-fork` selects the executable regular file at `~/.local/bin/codex-fork` for one launch and is consumed before Electron starts.
 - The fork-added `--bundled-codex` selector is rejected because bundled Codex is now the default.
+
+### Desktop release check
+
+- `codex-desktop --check-update` compares the installed numerical build with the first item in OpenAI's authoritative Sparkle appcast and exits without starting Electron.
+
+### Unified bundle scope
+
+- The transplant requires the current unified `ChatGPT.dmg`; legacy `Codex.dmg` bundles are intentionally unsupported.
 
 ### Electron installation safety
 

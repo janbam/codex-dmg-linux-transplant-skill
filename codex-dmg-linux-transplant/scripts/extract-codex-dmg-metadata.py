@@ -7,6 +7,7 @@ import sys
 import tempfile
 from pathlib import Path
 
+from codex_version import read_bundled_codex_version
 from dmg_layout import find_app_layout
 
 
@@ -39,14 +40,28 @@ def main():
         out = Path(td)
         layout = find_app_layout(str(dmg))
         run(['7z', 'x', str(dmg), f'-ir!{layout.info_plist}', '-y', f'-o{out}'])
-        run(['7z', 'x', str(dmg), f'-ir!{layout.resources}/app.asar', '-y', f'-o{out}'])
+        run([
+            '7z', 'x', str(dmg),
+            f'-ir!{layout.resources}/app.asar',
+            f'-ir!{layout.resources}/codex',
+            '-y', f'-o{out}',
+        ])
 
         contents = out / Path(layout.contents)
         plist_path = contents / 'Info.plist'
         asar_path = contents / 'Resources' / 'app.asar'
+        codex_path = contents / 'Resources' / 'codex'
+        if not codex_path.is_file():
+            raise SystemExit('failed to extract the bundled macOS codex binary from dmg')
 
         info = plistlib.load(plist_path.open('rb'))
         pkg = load_asar_package_json(asar_path)
+
+        # Treat the binary selected by OpenAI for this unified Desktop build as the CLI compatibility authority.
+        try:
+            codex_cli_version = read_bundled_codex_version(codex_path)
+        except ValueError as error:
+            raise SystemExit(str(error)) from None
 
         result = {
             'dmg_path': str(dmg),
@@ -56,6 +71,7 @@ def main():
             'electron_version': (pkg.get('devDependencies') or {}).get('electron'),
             'better_sqlite3_version': (pkg.get('dependencies') or {}).get('better-sqlite3'),
             'node_pty_version': (pkg.get('dependencies') or {}).get('node-pty'),
+            'codex_cli_version': codex_cli_version,
             'bundle_identifier': info.get('CFBundleIdentifier'),
             'bundle_version': info.get('CFBundleVersion'),
             'bundle_short_version': info.get('CFBundleShortVersionString'),

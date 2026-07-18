@@ -31,7 +31,7 @@ The current unified bundle also contains platform-gated macOS addons and optiona
 
 ## CLI
 
-Install `@openai/codex` into the stage and use that bundled Linux CLI by default. The wrapper accepts `--use-fork` to select `~/.local/bin/codex-fork` explicitly; it never copies or executes the macOS CLI from the DMG.
+Read the exact Codex CLI version embedded in the DMG's macOS binary, then install that `@openai/codex` version into the stage for Linux. The exact install bypasses machine-wide npm release-age and lifecycle gates through temporary empty npm configuration files; it does not weaken the operator's normal npm configuration. The wrapper uses this matching Linux CLI by default, accepts `--use-fork` to select `~/.local/bin/codex-fork` explicitly, and never executes the macOS binary.
 
 ## Failure handling
 
