@@ -1,6 +1,6 @@
 ---
 name: codex-dmg-linux-transplant
-description: "Install, update, or repair the ChatGPT desktop app on Linux from ChatGPT.dmg (formerly Codex.dmg) when no official Linux build exists. Use for fresh installs, DMG updates, Codex-to-ChatGPT migration, replacing an existing transplanted desktop build, or repairing its codex:// deep-link handler."
+description: "Install, update, or repair the unified ChatGPT desktop app on Linux from ChatGPT.dmg when no official Linux build exists. Use for fresh installs, DMG updates, replacing an existing transplanted desktop build, or repairing its codex:// deep-link handler."
 ---
 
 # ChatGPT/Codex DMG → Linux Transplant
@@ -24,6 +24,7 @@ Transplant the macOS ChatGPT desktop app—the renamed Codex app—onto Linux. T
 10. **DMG source order:** user path → safe local search → `https://persistent.oaistatic.com/codex-app-prod/ChatGPT.dmg`.
 11. **Do not bypass Chromium sandboxing.** If `chrome-sandbox` needs root ownership, ask the human to run the required `sudo chown` and `sudo chmod 4755` commands.
 12. **Publish the `codex://` handler.** A `MimeType` declaration alone is insufficient; refresh the desktop database, assign the default handler, and verify it.
+13. **Require the unified `ChatGPT.dmg`.** Legacy `Codex.dmg` bundles are intentionally unsupported.
 
 ## Required reading order
 
@@ -70,12 +71,14 @@ review the script's warning and rerun only that bootstrap command with
 `CODEX_TRANSPLANT_RUN_ELECTRON_INSTALL_JS=1`. This opt-in executes Electron's
 package-local `install.js`; do not disable global npm safeguards.
 
-Install a Linux Codex CLI into the bundle:
+Install the exact Codex CLI version reported by the metadata script into the bundle:
 
 ```bash
-./scripts/install-codex-cli.sh /tmp/codex-stage
+./scripts/install-codex-cli.sh /tmp/codex-stage <codex-cli-version>
 ./scripts/rebuild-native-modules.sh /tmp/codex-stage <electron-version> <better-sqlite3-version> <node-pty-version>
 ```
+
+The installer isolates this exact package install from machine-wide npm release-age and lifecycle-script restrictions. It does not disable those safeguards for any other npm operation.
 
 ### 5) Install the main version
 
@@ -92,6 +95,8 @@ For an otherwise working install whose browser deep link reports “No Apps avai
 Check all of these:
 
 The generated wrapper uses the bundled Linux Codex CLI installed into the app directory by default. Pass `--use-fork` to select `~/.local/bin/codex-fork` for that launch.
+
+Run `~/.local/bin/codex-desktop --check-update` to compare the installed build with the first release in OpenAI's Desktop appcast without launching Electron.
 
 Verification is mandatory:
 

@@ -18,6 +18,7 @@ Do not rename these during an ordinary update. Upstream still uses Codex interna
 ```text
 ~/.local/opt/codex-desktop/
 ├── cli/
+├── check-desktop-update.py
 ├── electron/
 ├── package.json
 ├── icon.png
@@ -36,6 +37,7 @@ The wrapper must:
 - use the bundled Linux Codex CLI by default
 - accept `--use-fork` to select `~/.local/bin/codex-fork` for one launch
 - consume `--use-fork` instead of forwarding it to Electron
+- accept `--check-update` by itself to report the installed and latest Desktop builds without launching Electron
 - fail clearly when the selected CLI is missing or not executable
 - reject the obsolete `--bundled-codex` selector because bundled Codex is already the default
 - launch the self-contained Electron runtime from the app directory
@@ -43,6 +45,8 @@ The wrapper must:
 - expose `plugins/` and `skills/` under Electron's runtime resource directory
 - pass Wayland flags when appropriate
 - avoid `--no-sandbox`; configure `chrome-sandbox` ownership and mode instead
+
+The installed app metadata records both the Desktop build and the exact bundled Codex CLI version. `codex-desktop --check-update` compares the numerical Desktop build with the first item in OpenAI's Sparkle appcast; it does not use CLI releases as a proxy for Desktop availability.
 
 ## Desktop entry
 
