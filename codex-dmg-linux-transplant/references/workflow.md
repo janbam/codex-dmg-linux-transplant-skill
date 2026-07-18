@@ -38,9 +38,11 @@ The feed is the release authority. The static DMG URL is rolling and does not in
 7. Install a Linux Codex CLI into the bundle with `../scripts/install-codex-cli.sh`
 8. Rebuild Linux-native modules with `../scripts/rebuild-native-modules.sh`
 9. Write the main install layout with `../scripts/write-main-install.sh`
-10. Automatically patch desktop-only renderer flags during install
-11. Ensure Chromium's `chrome-sandbox` helper is owned by `root:root` with mode `4755`; ask the human to run the `sudo` commands because Codex does not have root
-12. Launch the installed wrapper and verify it works
+   - The installer patches desktop-only renderer flags.
+   - The installer publishes the desktop entry and makes it the default `codex://` handler.
+10. Ensure Chromium's `chrome-sandbox` helper is owned by `root:root` with mode `4755`; ask the human to run the `sudo` commands because Codex does not have root
+11. Launch the installed wrapper and verify it works
+12. Open the desktop app from ChatGPT Web and verify `codex://threads/new` reaches ChatGPT
 13. Remove stale versioned launchers and old shims after verification
 
 ## Staging layout
@@ -64,6 +66,9 @@ The asset extractor removes `.app`, `.dSYM`, and Mach-O files from copied plugin
 - Wrapper launches from `~/.local/bin/codex-desktop`
 - Desktop entry points to the wrapper
 - Desktop entry displays `ChatGPT` and uses the icon named by the DMG
+- `xdg-mime query default x-scheme-handler/codex` returns `codex-desktop.desktop`
+- `gio mime x-scheme-handler/codex`, when available, lists `codex-desktop.desktop` as registered and default
+- ChatGPT Web can open the installed app through `codex://threads/new`
 - The wrapper uses bundled Codex by default and selects `~/.local/bin/codex-fork` only with `--use-fork`
 - `resources/app.asar` matches the new DMG build
 - `resources/app.asar.unpacked` contains Linux-native modules

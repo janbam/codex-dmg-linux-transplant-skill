@@ -2,7 +2,8 @@
 set -euo pipefail
 
 missing=()
-for cmd in python3 node npm git curl 7z gcc g++ make; do
+# Treat desktop handler publication as a core install capability, not a best-effort postflight.
+for cmd in python3 node npm git curl 7z gcc g++ make xdg-mime update-desktop-database; do
   command -v "$cmd" >/dev/null 2>&1 || missing+=("$cmd")
 done
 
@@ -11,20 +12,7 @@ if [[ ${#missing[@]} -eq 0 ]]; then
   exit 0
 fi
 
-echo "missing prerequisites: ${missing[*]}"
-
-if command -v pacman >/dev/null 2>&1; then
-  sudo pacman -Sy --needed --noconfirm base-devel python nodejs npm git curl p7zip
-elif command -v apt-get >/dev/null 2>&1; then
-  sudo apt-get update
-  sudo apt-get install -y build-essential python3 python3-venv python3-pip nodejs npm git curl p7zip-full
-elif command -v dnf >/dev/null 2>&1; then
-  sudo dnf install -y gcc gcc-c++ make python3 python3-pip nodejs npm git curl p7zip p7zip-plugins
-elif command -v zypper >/dev/null 2>&1; then
-  sudo zypper install -y gcc gcc-c++ make python3 python3-pip nodejs npm git curl p7zip
-else
-  echo 'unsupported package manager for automatic prerequisite install' >&2
-  exit 1
-fi
-
-echo 'prerequisite install step completed'
+# Keep root-owned package installation at the human boundary instead of invoking sudo from Codex.
+echo "missing prerequisites: ${missing[*]}" >&2
+echo 'ask the system administrator to install the missing commands, then rerun this check' >&2
+exit 1

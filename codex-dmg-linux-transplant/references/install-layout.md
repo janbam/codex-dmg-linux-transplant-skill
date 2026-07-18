@@ -52,7 +52,28 @@ The desktop file must:
 - display the name `ChatGPT`
 - use the icon extracted from the DMG
 - retain `x-scheme-handler/codex`
+- accept deep-link URLs through the `%U` field code
+- be published with `update-desktop-database`
+- become the default handler through `xdg-mime`
 - replace older user-local Codex desktop entries after verification
+
+Declaring `MimeType=x-scheme-handler/codex;` in the desktop file is not enough. Without refreshing the desktop database and assigning the default handler, GNOME can show “No Apps available” when ChatGPT Web opens `codex://threads/new`.
+
+### Repair an existing handler
+
+When the installed wrapper already works and the desktop entry passes validation, repair the association without rebuilding the transplant:
+
+```bash
+desktop-file-validate ~/.local/share/applications/codex-desktop.desktop
+update-desktop-database ~/.local/share/applications
+xdg-mime default codex-desktop.desktop x-scheme-handler/codex
+xdg-mime query default x-scheme-handler/codex
+gio mime x-scheme-handler/codex  # when gio is available
+```
+
+The XDG query must return `codex-desktop.desktop`. When `gio` is available, its output must list the same desktop entry as registered and default. Finish with a real click on **Open desktop app** in ChatGPT Web; querying configuration alone does not prove browser-to-app delivery.
+
+The installer commits the app layout before registering the scheme. If only registration fails, it preserves that layout and any previous-install backup, exits nonzero, and points to this repair sequence. Repair the association in place, then complete the normal launch and live verification.
 
 ## Cleanup
 
