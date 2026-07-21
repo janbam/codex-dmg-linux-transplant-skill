@@ -77,6 +77,8 @@ gio mime x-scheme-handler/codex  # when gio is available
 
 The XDG query must return `codex-desktop.desktop`. When `gio` is available, its output must list the same desktop entry as registered and default. Finish with a real click on **Open desktop app** in ChatGPT Web; querying configuration alone does not prove browser-to-app delivery.
 
+The transplanted app may still log `Failed to register codex:// protocol handler` at startup. Upstream calls Electron's `app.setAsDefaultProtocolClient()` from the bundled Electron executable, which does not represent the stable Linux wrapper and desktop entry. Do not patch or suppress that warning: the XDG/GIO checks above and the browser-to-app click are authoritative on Linux.
+
 The installer commits the app layout before registering the scheme. If only registration fails, it preserves that layout and any previous-install backup, exits nonzero, and points to this repair sequence. Repair the association in place, then complete the normal launch and live verification.
 
 ## Cleanup
