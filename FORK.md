@@ -16,6 +16,12 @@ This ledger records intentional differences from [`IgorWarzocha/codex-dmg-linux-
 
 - `codex-desktop --check-update` compares the installed numerical build with the first item in OpenAI's authoritative Sparkle appcast and exits without starting Electron.
 
+### Semantic desktop feature patching
+
+- Desktop feature patching discovers the current renderer function and its minified bridge/React aliases from the stable `electron-desktop-features-changed` protocol shape.
+- The patch replaces only that function and never carries release-local minified names or globally rewrites feature-gate calls.
+- Missing, duplicated, or structurally ambiguous semantic targets fail closed rather than risking unrelated renderer behavior.
+
 ### Unified bundle scope
 
 - The transplant requires the current unified `ChatGPT.dmg`; legacy `Codex.dmg` bundles are intentionally unsupported.

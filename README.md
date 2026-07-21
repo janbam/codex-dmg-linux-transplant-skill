@@ -23,4 +23,4 @@ Default sources:
 - DMG: `https://persistent.oaistatic.com/codex-app-prod/ChatGPT.dmg`
 - release feed: `https://persistent.oaistatic.com/codex-app-prod/appcast.xml`
 
-Tested against ChatGPT Desktop **26.707.31428** (build **5059**, Electron **42.1.0**), published July 9, 2026. Legacy `Codex.dmg` bundles are intentionally unsupported.
+Tested against ChatGPT Desktop **26.715.70719** (build **5650**, Electron **42.3.0**), published July 21, 2026. Legacy `Codex.dmg` bundles are intentionally unsupported.

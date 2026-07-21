@@ -88,6 +88,8 @@ The installer isolates this exact package install from machine-wide npm release-
 
 This also patches recognized desktop feature flags, writes a ChatGPT-branded desktop entry, publishes it to the desktop MIME database, and makes it the default `codex://` handler.
 
+Desktop feature patching must discover the current renderer function and its bridge/React aliases from the stable `electron-desktop-features-changed` dispatch. Never carry minified identifiers or globally replace gate calls between releases; an absent or ambiguous semantic target must remain unmodified or fail clearly.
+
 For an otherwise working install whose browser deep link reports “No Apps available,” skip the transplant rebuild and use the handler-only repair in `references/install-layout.md`.
 
 ### 6) Verify the final install
@@ -107,6 +109,7 @@ Verification is mandatory:
 - the icon came from the DMG
 - the wrapper selects bundled Codex by default and selects `codex-fork` only with `--use-fork`
 - the wrapper launches from the final path
+- Settings opens without triggering the renderer error boundary
 - no stale versioned launchers remain unless requested
 
 If launch fails, inspect and fix the actual error. Never treat a successful extraction or build as proof that the transplant works.
