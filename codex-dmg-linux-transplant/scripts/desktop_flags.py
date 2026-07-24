@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Rewrite the renderer's semantic desktop-feature dispatch without alias guesses."""
+"""Force portable renderer features without discarding upstream capabilities."""
 
 from __future__ import annotations
 
@@ -36,9 +36,6 @@ _DISPATCH_BYTES = re.compile(
 _FUNCTION_START = re.compile(
     rf"^function (?P<name>{_IDENTIFIER})\([^{{}}]*\) \{{$"
 )
-_USE_EFFECT = re.compile(rf"\(0,\s*(?P<react>{_IDENTIFIER})\.useEffect\)\(")
-
-
 class DesktopFlagPatchError(ValueError):
     """Report a renderer shape that cannot be patched without guessing."""
 
@@ -76,7 +73,7 @@ def find_desktop_feature_bundle(root: Path) -> Path | None:
 
 
 def patch_desktop_flags(text: str) -> DesktopFlagPatch:
-    """Replace only the function that publishes supported desktop features."""
+    """Force supported properties inside the semantic desktop-feature dispatch."""
     # Anchor discovery in the stable Electron protocol instead of release-local aliases.
     dispatches = list(_DISPATCH.finditer(text))
     if len(dispatches) != 1:
@@ -91,36 +88,24 @@ def patch_desktop_flags(text: str) -> DesktopFlagPatch:
     dispatch_line = _line_containing(offsets, lines, dispatch.start())
     function_start, function_name = _find_enclosing_function(lines, dispatch_line)
     function_end = _find_function_end(lines, function_start)
-    original_function = "".join(lines[function_start:function_end])
-
     function_offset = offsets[function_start]
-    function_limit = function_offset + len(original_function)
+    function_limit = offsets[function_end - 1] + len(lines[function_end - 1])
     if not function_offset <= dispatch.start() < function_limit:
         raise DesktopFlagPatchError("desktop feature dispatch escaped its owning function")
 
-    # Discover current feature keys and React aliases from the semantic dispatch.
+    # Isolate the dispatched object so every unforced upstream capability survives.
     dispatch_end = _find_matching_brace(text, dispatch.end() - 1)
     if re.match(r"\s*\)", text[dispatch_end + 1 :]) is None:
         raise DesktopFlagPatchError("desktop feature object boundary is ambiguous")
-    features = _find_dispatched_features(text[dispatch.end() : dispatch_end])
+    object_body, features = _force_dispatched_features(
+        text[dispatch.end() : dispatch_end]
+    )
     if "browserPane" not in features:
         raise DesktopFlagPatchError("desktop feature dispatch does not expose browserPane")
 
-    react_aliases = {match.group("react") for match in _USE_EFFECT.finditer(original_function)}
-    if len(react_aliases) != 1:
-        raise DesktopFlagPatchError(
-            f"expected one React useEffect alias, found {len(react_aliases)}"
-        )
-    react_alias = react_aliases.pop()
-
-    replacement = _render_forced_dispatch(
-        function_name=function_name,
-        bridge_alias=dispatch.group("bridge"),
-        react_alias=react_alias,
-        features=features,
-    )
+    # Rewrite only the known property values, preserving the publisher around them.
     return DesktopFlagPatch(
-        text="".join(lines[:function_start]) + replacement + "".join(lines[function_end:]),
+        text=text[: dispatch.end()] + object_body + text[dispatch_end:],
         function_name=function_name,
         features=features,
     )
@@ -215,26 +200,66 @@ def _find_matching_brace(text: str, opening_brace: int) -> int:
     raise DesktopFlagPatchError("failed to locate desktop feature dispatch end")
 
 
-def _find_dispatched_features(object_body: str) -> tuple[str, ...]:
-    """Read supported top-level keys from one Prettier-formatted object body."""
+def _force_dispatched_features(object_body: str) -> tuple[str, tuple[str, ...]]:
+    """Force portable top-level properties and preserve every other object entry."""
     # Remove deceptive property-shaped text before indentation reveals object structure.
     code_body = _mask_literals_and_comments(object_body)
     property_pattern = re.compile(
         rf"^(?P<indent>[ \t]*)(?P<key>{_IDENTIFIER})\s*(?::|,|$)", re.MULTILINE
     )
     properties = [
-        (len(match.group("indent")), match.group("key"))
+        (len(match.group("indent")), match.group("key"), match.start())
         for match in property_pattern.finditer(code_body)
     ]
     if not properties:
         raise DesktopFlagPatchError("desktop feature dispatch has no readable properties")
 
-    top_level_indent = min(indent for indent, _ in properties)
-    top_level_keys = {
-        key for indent, key in properties if indent == top_level_indent
-    }
-    return tuple(
-        feature for feature in FORCED_DESKTOP_FEATURES if feature in top_level_keys
+    top_level_indent = min(indent for indent, _, _ in properties)
+    source_lines = object_body.splitlines(keepends=True)
+    masked_lines = code_body.splitlines(keepends=True)
+    offsets = _line_offsets(source_lines)
+    forced: list[str] = []
+
+    # Force only allowlisted top-level entries whose formatted shape is unambiguous.
+    for indent, key, position in properties:
+        if indent != top_level_indent or key not in FORCED_DESKTOP_FEATURES:
+            continue
+        line_index = _line_containing(offsets, source_lines, position)
+        source_lines[line_index] = _force_simple_property(
+            source_lines[line_index], masked_lines[line_index], key
+        )
+        forced.append(key)
+
+    ordered_features = tuple(
+        feature for feature in FORCED_DESKTOP_FEATURES if feature in forced
+    )
+    return "".join(source_lines), ordered_features
+
+
+def _force_simple_property(source_line: str, masked_line: str, key: str) -> str:
+    """Replace one simple property value, or expand its shorthand, with true."""
+    key_pattern = re.escape(key)
+    value_property = re.fullmatch(
+        rf"[ \t]*{key_pattern}[ \t]*:[ \t]*"
+        rf"(?P<value>[^,\r\n]*?\S)(?P<spacing>[ \t]*),[ \t]*(?:\r?\n)?",
+        masked_line,
+    )
+    if value_property is not None:
+        # Change the value span alone so original spacing and comments remain intact.
+        start, end = value_property.span("value")
+        return source_line[:start] + "!0" + source_line[end:]
+
+    shorthand_property = re.fullmatch(
+        rf"[ \t]*(?P<key>{key_pattern})[ \t]*,[ \t]*(?:\r?\n)?",
+        masked_line,
+    )
+    if shorthand_property is not None:
+        # Expand shorthand locally without rebuilding the surrounding object.
+        key_end = shorthand_property.end("key")
+        return source_line[:key_end] + ": !0" + source_line[key_end:]
+
+    raise DesktopFlagPatchError(
+        f"desktop feature {key} is not a simple formatted property"
     )
 
 
@@ -287,27 +312,6 @@ def _mask_literals_and_comments(text: str) -> str:
         index += 1
 
     return "".join(masked)
-
-
-def _render_forced_dispatch(
-    *,
-    function_name: str,
-    bridge_alias: str,
-    react_alias: str,
-    features: tuple[str, ...],
-) -> str:
-    """Render the small replacement function using discovered bundle identifiers."""
-    feature_lines = "\n".join(f"      {feature}: enabled," for feature in features)
-    return f"""function {function_name}() {{
-  let enabled = !0;
-  (0, {react_alias}.useEffect)(() => {{
-    {bridge_alias}.dispatchMessage(`{DESKTOP_FEATURE_EVENT}`, {{
-{feature_lines}
-    }});
-  }}, []);
-  return null;
-}}
-"""
 
 
 def main(argv: list[str]) -> int:

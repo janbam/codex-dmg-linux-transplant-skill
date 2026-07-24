@@ -54,7 +54,7 @@ initializeRenderer();
 
 
 class DesktopFlagPatchTests(unittest.TestCase):
-    """Prove patch discovery follows semantics and stays inside its function."""
+    """Prove semantic forcing preserves the publisher and unrelated capabilities."""
 
     def test_forces_supported_current_features_without_touching_navigation(self):
         patch = patch_desktop_flags(CURRENT_RENDERER_SHAPE)
@@ -66,11 +66,13 @@ class DesktopFlagPatchTests(unittest.TestCase):
         self.assertIn("n = Yp()", patch.text)
         self.assertIn("return qo(`459748632`) && Yp()", patch.text)
         self.assertIn("initializeRenderer();", patch.text)
-        self.assertIn("ambientSuggestions: enabled", patch.text)
-        self.assertIn("browserPane: enabled", patch.text)
-        self.assertIn("multiWindow: enabled", patch.text)
-        self.assertNotIn("projectlessThreads: enabled", patch.text)
-        self.assertNotIn("computerUse: enabled", patch.text)
+        self.assertIn("ambientSuggestions: !0", patch.text)
+        self.assertIn("browserPane: !0", patch.text)
+        self.assertIn("multiWindow: !0", patch.text)
+        self.assertIn("computerUse,", patch.text)
+        self.assertIn("diagnostics: {", patch.text)
+        self.assertIn("projectlessThreads,", patch.text)
+        self.assertIn("}, []);", patch.text)
 
     def test_discovers_changed_minified_identifiers(self):
         renderer = CURRENT_RENDERER_SHAPE.replace("function xde()", "function $r()")
@@ -82,6 +84,28 @@ class DesktopFlagPatchTests(unittest.TestCase):
         self.assertEqual(patch.function_name, "$r")
         self.assertIn("(0, _R.useEffect)", patch.text)
         self.assertIn("$b.dispatchMessage", patch.text)
+
+    def test_preserves_effect_dependencies_and_property_comments(self):
+        renderer = CURRENT_RENDERER_SHAPE.replace(
+            "      browserPane: browser,",
+            "      browserPane: browser, // portable renderer pane",
+        ).replace("  }, []);", "  }, [browser]);")
+
+        patch = patch_desktop_flags(renderer)
+
+        self.assertIn("browserPane: !0, // portable renderer pane", patch.text)
+        self.assertIn("}, [browser]);", patch.text)
+
+    def test_rejects_a_multiline_forced_property_instead_of_rebuilding_it(self):
+        renderer = CURRENT_RENDERER_SHAPE.replace(
+            "      browserPane: browser,",
+            "      browserPane: choosePane(\n        browser,\n      ),",
+        )
+
+        with self.assertRaisesRegex(
+            DesktopFlagPatchError, "browserPane is not a simple formatted property"
+        ):
+            patch_desktop_flags(renderer)
 
     def test_rejects_ambiguous_dispatches_instead_of_guessing(self):
         renderer = CURRENT_RENDERER_SHAPE + CURRENT_RENDERER_SHAPE.replace(
