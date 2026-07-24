@@ -18,8 +18,10 @@ This ledger records intentional differences from [`IgorWarzocha/codex-dmg-linux-
 
 ### Semantic desktop feature patching
 
-- Desktop feature patching discovers the current renderer function and its minified bridge/React aliases from the stable `electron-desktop-features-changed` protocol shape.
-- The patch replaces only that function and never carries release-local minified names or globally rewrites feature-gate calls.
+- Desktop feature patching discovers the current renderer function and feature object from the stable `electron-desktop-features-changed` protocol shape.
+- The patch forces only recognized portable property values, preserving the upstream publisher, effect dependencies, unknown capabilities, and platform-dependent values.
+- It never carries release-local minified names, rebuilds the dispatch object, or globally rewrites feature-gate calls.
+- The Linux renderer copy distinguishes unavailable global dictation shortcuts from working in-app composer dictation, anchored to the stable translation descriptor rather than a release-local bundle name.
 - Missing, duplicated, or structurally ambiguous semantic targets fail closed rather than risking unrelated renderer behavior.
 
 ### Unified bundle scope

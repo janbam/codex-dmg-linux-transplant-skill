@@ -133,8 +133,9 @@ npx --yes prettier "$target_js" > "$pretty_js"
 npx --yes prettier "$pretty_js" >/dev/null
 
 install -m 0644 "$pretty_js" "$target_js"
+"$python_bin" "$script_dir/dictation_copy.py" "$extract_dir"
 
-if ! rg -q 'browserPane: enabled' "$target_js"; then
+if ! rg -q 'browserPane: !0' "$target_js"; then
   echo 'desktop flag patch did not apply as expected' >&2
   exit 1
 fi

@@ -88,7 +88,7 @@ The installer isolates this exact package install from machine-wide npm release-
 
 This also patches recognized desktop feature flags, writes a ChatGPT-branded desktop entry, publishes it to the desktop MIME database, and makes it the default `codex://` handler.
 
-Desktop feature patching must discover the current renderer function and its bridge/React aliases from the stable `electron-desktop-features-changed` dispatch. Never carry minified identifiers or globally replace gate calls between releases; an absent or ambiguous semantic target must remain unmodified or fail clearly.
+Desktop feature patching must discover the current renderer function and feature object from the stable `electron-desktop-features-changed` dispatch. Force only recognized portable property values while preserving the upstream publisher and every unforced capability. Never carry minified identifiers, rebuild the dispatch object, or globally replace gate calls between releases; an absent or ambiguous semantic target must remain unmodified or fail clearly.
 
 For an otherwise working install whose browser deep link reports “No Apps available,” skip the transplant rebuild and use the handler-only repair in `references/install-layout.md`.
 
